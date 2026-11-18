@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+
+    <!-- Collapsed floating pill -->
+    <TextView
+        android:id="@+id/collapsedPill"
+        android:layout_width="46dp"
+        android:layout_height="46dp"
+        android:background="@drawable/bg_overlay_pill"
+        android:gravity="center"
+        android:text="跳"
+        android:textColor="#FFFFFFFF"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <!-- Expanded floating control panel -->
+    <LinearLayout
+        android:id="@+id/expandedPanel"
+        android:layout_width="244dp"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_overlay_panel"
+        android:orientation="vertical"
+        android:padding="10dp">
+
+        <!-- Drag handle + live status + collapse -->
+        <LinearLayout
+            android:id="@+id/dragHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingBottom="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingEnd="6dp"
+                android:text="⋮⋮"
+                android:textColor="#FF38BDF8"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvOverlayStatus"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:text="待命 · 0跳"
+                android:textColor="#FFF1F5F9"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btnCollapse"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_overlay_btn"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp"
+                android:text="收起"
+                android:textColor="#FFCBD5E1"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- Primary jump actions -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/btnAutoToggle"
+                android:layout_width="0dp"
+                android:layout_height="34dp"
+                android:layout_marginEnd="5dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_overlay_btn_accent"
+                android:gravity="center"
+                android:text="▶ 自动"
+                android:textColor="#FFFFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btnSingleStep"
+                android:layout_width="0dp"
+                android:layout_height="34dp"
+                android:layout_marginEnd="5dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_overlay_btn"
+                android:gravity="center"
+                android:text="⏭ 单步"
+                android:textColor="#FFE2E8F0"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btnManualAim"
+                android:layout_width="0dp"
+                android:layout_height="34dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_overlay_btn"
+                android:gravity="center"
+                android:text="🎯 双点"
+                android:textColor="#FF7DD3FC"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Coefficient tuning row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="7dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/btnMinus20"
+                android:layout_width="0dp"
+                android:layout_height="28dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_overlay_btn"
+                android:gravity="center"
+                android:text="-20"
+                android:textColor="#FFCBD5E1"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/btnMinus5"
+                android:layout_width="0dp"
+                android:layout_height="28dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_overlay_btn"
+                android:gravity="center"
+                android:text="-5"
+                android:textColor="#FFCBD5E1"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/tvCoeffOverlay"
+                android:layout_width="0dp"
+                android:layout_height="28dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1.4"
+                android:background="@drawable/bg_overlay_btn"
+                android:gravity="center"
+                android:text="1700"
+                android:textColor="#FF38BDF8"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btnPlus5"
+                android:layout_width="0dp"
+                android:layout_height="28dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_overlay_btn"
+                android:gravity="center"
+                android:text="+5"
+                android:textColor="#FFCBD5E1"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/btnPlus20"
+                android:layout_width="0dp"
+                android:layout_height="28dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_overlay_btn"
+                android:gravity="center"
+                android:text="+20"
+                android:textColor="#FFCBD5E1"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- Last jump telemetry -->
+        <TextView
+            android:id="@+id/tvLastJump"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:ellipsize="end"
+            android:singleLine="true"
+            android:text="系数长按重置 · 拖动顶部移动"
+            android:textColor="#FF94A3B8"
+            android:textSize="10sp" />
+    </LinearLayout>
+
+</FrameLayout>

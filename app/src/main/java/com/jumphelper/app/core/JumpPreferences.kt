@@ -1,0 +1,73 @@
+package com.jumphelper.app.core
+
+import android.content.Context
+import android.content.SharedPreferences
+
+class JumpPreferences(context: Context) {
+
+    private val prefs: SharedPreferences =
+        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    var jumpFullWidthMs: Int
+        get() = prefs.getInt(KEY_FULL_WIDTH_MS, JumpDetector.DEFAULT_JUMP_FULL_WIDTH_MS)
+            .coerceIn(MIN_COEFF_MS, MAX_COEFF_MS)
+        set(value) {
+            prefs.edit().putInt(KEY_FULL_WIDTH_MS, value.coerceIn(MIN_COEFF_MS, MAX_COEFF_MS)).apply()
+        }
+
+    var minIntervalMs: Int
+        get() = prefs.getInt(KEY_MIN_INTERVAL_MS, DEFAULT_MIN_INTERVAL_MS)
+            .coerceIn(1000, 4000)
+        set(value) {
+            prefs.edit().putInt(KEY_MIN_INTERVAL_MS, value.coerceIn(1000, 4000)).apply()
+        }
+
+    val maxIntervalMs: Int
+        get() = minIntervalMs + INTERVAL_JITTER_MS
+
+    var showDebugMarker: Boolean
+        get() = prefs.getBoolean(KEY_DEBUG_MARKER, true)
+        set(value) {
+            prefs.edit().putBoolean(KEY_DEBUG_MARKER, value).apply()
+        }
+
+    var showOverlay: Boolean
+        get() = prefs.getBoolean(KEY_SHOW_OVERLAY, true)
+        set(value) {
+            prefs.edit().putBoolean(KEY_SHOW_OVERLAY, value).apply()
+        }
+
+    var overlayX: Int
+        get() = prefs.getInt(KEY_OVERLAY_X, Int.MIN_VALUE)
+        set(value) {
+            prefs.edit().putInt(KEY_OVERLAY_X, value).apply()
+        }
+
+    var overlayY: Int
+        get() = prefs.getInt(KEY_OVERLAY_Y, Int.MIN_VALUE)
+        set(value) {
+            prefs.edit().putInt(KEY_OVERLAY_Y, value).apply()
+        }
+
+    fun resetOverlayPosition() {
+        prefs.edit()
+            .remove(KEY_OVERLAY_X)
+            .remove(KEY_OVERLAY_Y)
+            .apply()
+    }
+
+    companion object {
+        const val MIN_COEFF_MS = 1000
+        const val MAX_COEFF_MS = 2600
+        const val DEFAULT_MIN_INTERVAL_MS = 1450
+        const val INTERVAL_JITTER_MS = 600
+
+        private const val PREFS_NAME = "jump_helper_prefs"
+        private const val KEY_FULL_WIDTH_MS = "full_width_ms"
+        private const val KEY_MIN_INTERVAL_MS = "min_interval_ms"
+        private const val KEY_DEBUG_MARKER = "debug_marker"
+        private const val KEY_SHOW_OVERLAY = "show_overlay"
+        private const val KEY_OVERLAY_X = "overlay_x"
+        private const val KEY_OVERLAY_Y = "overlay_y"
+    }
+}

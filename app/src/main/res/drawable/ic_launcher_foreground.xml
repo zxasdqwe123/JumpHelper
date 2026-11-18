@@ -1,0 +1,33 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Target diamond platform -->
+    <path
+        android:fillColor="#22C55E"
+        android:pathData="M68,42 L84,51 L68,60 L52,51 Z" />
+    <path
+        android:fillColor="#16A34A"
+        android:pathData="M52,51 L68,60 L68,72 L52,63 Z" />
+    <path
+        android:fillColor="#15803D"
+        android:pathData="M84,51 L68,60 L68,72 L84,63 Z" />
+
+    <!-- Trajectory arc -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M36,57 Q52,26 68,50"
+        android:strokeColor="#38BDF8"
+        android:strokeLineCap="round"
+        android:strokeWidth="3" />
+
+    <!-- Pawn body -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M36,52 C32,52 29,63 29,70 C29,73 43,73 43,70 C43,63 40,52 36,52 Z" />
+    <!-- Pawn head -->
+    <path
+        android:fillColor="#7DD3FC"
+        android:pathData="M36,38 A6,6 0 1,0 36,50 A6,6 0 1,0 36,38 Z" />
+</vector>

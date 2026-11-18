@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">跳一跳助手</string>
+    <string name="accessibility_service_label">JumpHelper 跳一跳助手</string>
+    <string name="accessibility_service_description">用于在微信跳一跳中无弹窗截图识别棋子与目标方块位置，并通过悬浮控制条执行单步跳、自动连跳或手动双点瞄准长按手势。仅本地像素计算，不收集任何个人数据。</string>
+
+    <string name="wechat_not_installed">未检测到微信客户端，请先安装微信或手动切回跳一跳</string>
+    <string name="service_not_ready">请先在系统设置中开启「JumpHelper 跳一跳助手」无障碍服务</string>
+</resources>
