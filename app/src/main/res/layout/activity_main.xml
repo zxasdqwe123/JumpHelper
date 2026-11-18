@@ -235,7 +235,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:max="1600"
+                android:max="1800"
                 android:progress="700" />
 
             <LinearLayout
@@ -245,14 +245,14 @@
                 android:orientation="horizontal">
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnHomeMinus10"
+                    android:id="@+id/btnHomeMinus20"
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
                     android:layout_height="38dp"
                     android:layout_marginEnd="6dp"
                     android:layout_weight="1"
                     android:padding="0dp"
-                    android:text="-10 ms"
+                    android:text="-20 ms"
                     android:textSize="12sp"
                     app:cornerRadius="10dp" />
 
@@ -269,13 +269,103 @@
                     app:cornerRadius="10dp" />
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnHomePlus10"
+                    android:id="@+id/btnHomePlus20"
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
                     android:layout_height="38dp"
                     android:layout_weight="1"
                     android:padding="0dp"
-                    android:text="+10 ms"
+                    android:text="+20 ms"
+                    android:textSize="12sp"
+                    app:cornerRadius="10dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="启用跳一跳抛物线二次修正（防短跳近/长跳飞）"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchPhysicsCurve"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvOffsetValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="固定触控延迟补偿：0 ms"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="若近距离和远距离都固定偏近或偏远，微调此补偿（-120~+120ms）。"
+                android:textColor="@color/text_muted"
+                android:textSize="12sp" />
+
+            <SeekBar
+                android:id="@+id/seekOffset"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:max="240"
+                android:progress="120" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnOffsetMinus5"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:padding="0dp"
+                    android:text="-5 ms"
+                    android:textSize="12sp"
+                    app:cornerRadius="10dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnOffsetReset"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:padding="0dp"
+                    android:text="归零 (0)"
+                    android:textSize="12sp"
+                    app:cornerRadius="10dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnOffsetPlus5"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_weight="1"
+                    android:padding="0dp"
+                    android:text="+5 ms"
                     android:textSize="12sp"
                     app:cornerRadius="10dp" />
             </LinearLayout>
@@ -285,7 +375,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
-                android:text="连跳随机等待：1450 ~ 2050 ms"
+                android:text="连跳随机等待：2200 ~ 2800 ms"
                 android:textColor="@color/text_primary"
                 android:textSize="13sp"
                 android:textStyle="bold" />
@@ -295,8 +385,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
-                android:max="1800"
-                android:progress="350" />
+                android:max="2600"
+                android:progress="1000" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -309,7 +399,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="识别后短暂显示棋子与落点准星标线"
+                    android:text="识别后显示棋子与落点准星标线（1.25秒）"
                     android:textColor="@color/text_secondary"
                     android:textSize="13sp" />
 
@@ -333,7 +423,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="运行状态与手动兜底说明"
+                android:text="运行状态与高分屏调校说明"
                 android:textColor="@color/text_primary"
                 android:textSize="16sp"
                 android:textStyle="bold" />
@@ -352,7 +442,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:lineSpacingExtra="3dp"
-                android:text="• 自动/单步：无弹窗调用 takeScreenshot() 截图，纯 Kotlin 扫描棋子底盘与目标顶点，使用 dispatchGesture() 在屏幕底部随机坐标模拟带微移的长按。\n• 手动双点兜底（🎯 双点）：遇到特殊方块、音符遮挡或异形皮肤时，点悬浮条「🎯 双点」，依次点「1. 棋子底座」和「2. 目标中心」，松手后自动精确蓄力跳跃。\n• 算法参考：wangshub/wechat_jump_game (Apache-2.0) wechat_jump_auto_slim.py 短边比例自适应思路。"
+                android:text="• 1.5K / P3 屏幕调校建议：开启准星标线，先点「⏭ 单步」观察青圈（棋子底座）和绿十字（目标顶面中心）是否对准；若准星准确但跳偏，跳近点悬浮条「+」，跳远点「-」。\n• 连跳节奏说明：已将默认连跳间隔提升至 2200~2800ms 并屏蔽边缘侧边栏与背景渐晕，确保落地弹跳与加分文字完全消失后再截下一帧。\n• 算法参考：wangshub/wechat_jump_game (Apache-2.0) wechat_jump_auto_slim.py 短边比例自适应思路。"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
         </LinearLayout>

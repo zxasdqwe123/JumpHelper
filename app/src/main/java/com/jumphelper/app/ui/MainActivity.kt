@@ -112,6 +112,10 @@ class MainActivity : AppCompatActivity() {
             prefs.showDebugMarker = isChecked
         }
 
+        binding.switchPhysicsCurve.setOnCheckedChangeListener { _, isChecked ->
+            prefs.usePhysicsCurve = isChecked
+        }
+
         binding.seekCoeff.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (suppressSeekCallback) return
@@ -123,20 +127,41 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
 
-        binding.btnHomeMinus10.setOnClickListener {
-            updateCoeffValue(prefs.jumpFullWidthMs - 10)
+        binding.btnHomeMinus20.setOnClickListener {
+            updateCoeffValue(prefs.jumpFullWidthMs - 20)
         }
-        binding.btnHomePlus10.setOnClickListener {
-            updateCoeffValue(prefs.jumpFullWidthMs + 10)
+        binding.btnHomePlus20.setOnClickListener {
+            updateCoeffValue(prefs.jumpFullWidthMs + 20)
         }
         binding.btnHomeResetCoeff.setOnClickListener {
             updateCoeffValue(JumpDetector.DEFAULT_JUMP_FULL_WIDTH_MS)
         }
 
+        binding.seekOffset.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (suppressSeekCallback) return
+                val offset = JumpDetector.MIN_PRESS_OFFSET_MS + progress
+                updateOffsetValue(offset)
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        binding.btnOffsetMinus5.setOnClickListener {
+            updateOffsetValue(prefs.pressOffsetMs - 5)
+        }
+        binding.btnOffsetPlus5.setOnClickListener {
+            updateOffsetValue(prefs.pressOffsetMs + 5)
+        }
+        binding.btnOffsetReset.setOnClickListener {
+            updateOffsetValue(JumpPreferences.DEFAULT_PRESS_OFFSET_MS)
+        }
+
         binding.seekInterval.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (suppressSeekCallback) return
-                val minMs = 1000 + progress
+                val minMs = JumpPreferences.MIN_INTERVAL_FLOOR_MS + progress
                 prefs.minIntervalMs = minMs
                 binding.tvIntervalValue.text =
                     "连跳随机等待：${prefs.minIntervalMs} ~ ${prefs.maxIntervalMs} ms"
@@ -150,13 +175,19 @@ class MainActivity : AppCompatActivity() {
     private fun syncPreferencesToViews() {
         binding.switchShowOverlay.isChecked = prefs.showOverlay
         binding.switchDebugMarker.isChecked = prefs.showDebugMarker
+        binding.switchPhysicsCurve.isChecked = prefs.usePhysicsCurve
 
         suppressSeekCallback = true
         val coeff = prefs.jumpFullWidthMs
         binding.seekCoeff.progress = (coeff - JumpPreferences.MIN_COEFF_MS).coerceIn(0, binding.seekCoeff.max)
         renderCoeffLabel(coeff)
 
-        val intervalProgress = (prefs.minIntervalMs - 1000).coerceIn(0, binding.seekInterval.max)
+        val offset = prefs.pressOffsetMs
+        binding.seekOffset.progress = (offset - JumpDetector.MIN_PRESS_OFFSET_MS).coerceIn(0, binding.seekOffset.max)
+        renderOffsetLabel(offset)
+
+        val intervalProgress = (prefs.minIntervalMs - JumpPreferences.MIN_INTERVAL_FLOOR_MS)
+            .coerceIn(0, binding.seekInterval.max)
         binding.seekInterval.progress = intervalProgress
         binding.tvIntervalValue.text =
             "连跳随机等待：${prefs.minIntervalMs} ~ ${prefs.maxIntervalMs} ms"
@@ -175,10 +206,25 @@ class MainActivity : AppCompatActivity() {
         renderCoeffLabel(clamped)
     }
 
+    private fun updateOffsetValue(rawValue: Int) {
+        val clamped = rawValue.coerceIn(JumpDetector.MIN_PRESS_OFFSET_MS, JumpDetector.MAX_PRESS_OFFSET_MS)
+        prefs.pressOffsetMs = clamped
+
+        suppressSeekCallback = true
+        binding.seekOffset.progress = clamped - JumpDetector.MIN_PRESS_OFFSET_MS
+        suppressSeekCallback = false
+        renderOffsetLabel(clamped)
+    }
+
     private fun renderCoeffLabel(coeff: Int) {
         val ratio = coeff / JumpDetector.DEFAULT_JUMP_FULL_WIDTH_MS.toFloat()
         val ratioStr = String.format(Locale.US, "%.2fx", ratio)
         binding.tvCoeffValue.text = "满短边蓄力系数：$coeff ms ($ratioStr)"
+    }
+
+    private fun renderOffsetLabel(offset: Int) {
+        val sign = if (offset > 0) "+" else ""
+        binding.tvOffsetValue.text = "固定触控延迟补偿：$sign$offset ms"
     }
 
     private fun observeControllerState() {
@@ -190,15 +236,24 @@ class MainActivity : AppCompatActivity() {
                         JumpControllerState.jumpCount,
                         JumpControllerState.lastStatusText,
                         JumpControllerState.lastDistancePx,
-                        JumpControllerState.lastPressMs
-                    ) { connected, count, status, dist, pressMs ->
+                        JumpControllerState.lastPressMs,
+                        JumpControllerState.lastScreenshotSize
+                    ) { values ->
+                        val connected = values[0] as Boolean
+                        val count = values[1] as Int
+                        val status = values[2] as String
+                        val dist = values[3] as Float
+                        val pressMs = values[4] as Long
+                        val shotSize = values[5] as String
+
                         val connLabel = if (connected) "服务已连接" else "服务未连接"
                         val metric = if (pressMs > 0L) {
                             " · 最近 ${dist.toInt()}px → ${pressMs}ms"
                         } else {
                             ""
                         }
-                        "状态：$connLabel · $status · 累计 $count 跳$metric"
+                        val shotLabel = if (shotSize.isNotEmpty()) " · 截图 $shotSize" else ""
+                        "状态：$connLabel · $status · 累计 $count 跳$metric$shotLabel"
                     }.collect { summary ->
                         binding.tvLiveMetrics.text = summary
                         updateAccessibilityStatusBanner()

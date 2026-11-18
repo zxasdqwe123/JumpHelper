@@ -122,9 +122,11 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
                     y2 = y2,
                     screenWidth = bounds.width(),
                     screenHeight = bounds.height(),
-                    jumpFullWidthMs = prefs.jumpFullWidthMs
+                    jumpFullWidthMs = prefs.jumpFullWidthMs,
+                    pressOffsetMs = prefs.pressOffsetMs,
+                    usePhysicsCurve = prefs.usePhysicsCurve
                 )
-                val distPx = kotlin.math.hypot((x2 - x1).toDouble(), (y2 - y1).toDouble()).toFloat()
+                val distPx = kotlin.math.abs(x2 - x1)
                 isCycleBusy = true
                 JumpControllerState.setRunMode(RunMode.PAUSED)
                 JumpControllerState.recordJump(distPx, pressMs, "手动跳跃")
@@ -194,7 +196,9 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
                             }
                             val outcome = BitmapPixelExtractor.analyzeScreenshot(
                                 screenshotResult = screenshot,
-                                jumpFullWidthMs = prefs.jumpFullWidthMs
+                                jumpFullWidthMs = prefs.jumpFullWidthMs,
+                                pressOffsetMs = prefs.pressOffsetMs,
+                                usePhysicsCurve = prefs.usePhysicsCurve
                             )
                             mainHandler.post {
                                 handleDetectionOutcome(outcome, isAutoLoop)
@@ -257,6 +261,7 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
             is JumpDetector.DetectionOutcome.Success -> {
                 screenshotRetryCount = 0
                 val res = outcome.result
+                JumpControllerState.setScreenshotSize(res.bitmapWidth, res.bitmapHeight)
                 val statusLabel = if (isAutoLoop) "连跳中" else "单步完成"
                 JumpControllerState.recordJump(res.distanceX, res.pressTimeMs, statusLabel)
                 overlayManager.refreshUi()
@@ -265,7 +270,9 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
                     pieceY = res.pieceY,
                     boardX = res.boardX,
                     boardY = res.boardY,
-                    pressMs = res.pressTimeMs
+                    pressMs = res.pressTimeMs,
+                    sourceWidth = res.bitmapWidth,
+                    sourceHeight = res.bitmapHeight
                 )
                 dispatchRandomizedLongPress(res.pressTimeMs, scheduleNextAuto = isAutoLoop)
             }
@@ -279,8 +286,8 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
         val barRect = overlayManager.getControlBarRect()
 
         val (startX, startY) = pickSafePressCoordinate(w, h, barRect)
-        val driftX = Random.nextFloat() * 14f - 7f
-        val driftY = Random.nextFloat() * 14f - 7f
+        val driftX = Random.nextFloat() * 4f - 2f
+        val driftY = Random.nextFloat() * 4f - 2f
         val endX = (startX + driftX).coerceIn(20f, (w - 20).toFloat())
         val endY = (startY + driftY).coerceIn(20f, (h - 20).toFloat())
 
@@ -323,8 +330,8 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
     private fun pickSafePressCoordinate(w: Int, h: Int, barRect: Rect): Pair<Float, Float> {
         val minX = w * 0.24f
         val maxX = w * 0.76f
-        val minY = h * 0.68f
-        val maxY = h * 0.83f
+        val minY = h * 0.65f
+        val maxY = h * 0.79f
         val paddedRect = Rect(barRect.left - 24, barRect.top - 24, barRect.right + 24, barRect.bottom + 24)
 
         repeat(10) {
@@ -335,12 +342,12 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
             }
         }
         // Fallback outside bar if control bar sits directly inside bottom area
-        val fallbackY = if (barRect.centerY() > h * 0.72f) h * 0.56f else h * 0.80f
+        val fallbackY = if (barRect.centerY() > h * 0.68f) h * 0.54f else h * 0.76f
         return (w * 0.5f) to fallbackY
     }
 
     companion object {
-        private const val OVERLAY_HIDE_SETTLE_MS = 75L
+        private const val OVERLAY_HIDE_SETTLE_MS = 120L
 
         @Volatile
         var instance: JumpAccessibilityService? = null

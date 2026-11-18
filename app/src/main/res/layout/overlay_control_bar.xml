@@ -121,26 +121,26 @@
             android:orientation="horizontal">
 
             <TextView
-                android:id="@+id/btnMinus20"
+                android:id="@+id/btnMinus50"
                 android:layout_width="0dp"
                 android:layout_height="28dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_overlay_btn"
                 android:gravity="center"
-                android:text="-20"
+                android:text="-50"
                 android:textColor="#FFCBD5E1"
                 android:textSize="11sp" />
 
             <TextView
-                android:id="@+id/btnMinus5"
+                android:id="@+id/btnMinus15"
                 android:layout_width="0dp"
                 android:layout_height="28dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_overlay_btn"
                 android:gravity="center"
-                android:text="-5"
+                android:text="-15"
                 android:textColor="#FFCBD5E1"
                 android:textSize="11sp" />
 
@@ -158,25 +158,25 @@
                 android:textStyle="bold" />
 
             <TextView
-                android:id="@+id/btnPlus5"
+                android:id="@+id/btnPlus15"
                 android:layout_width="0dp"
                 android:layout_height="28dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_overlay_btn"
                 android:gravity="center"
-                android:text="+5"
+                android:text="+15"
                 android:textColor="#FFCBD5E1"
                 android:textSize="11sp" />
 
             <TextView
-                android:id="@+id/btnPlus20"
+                android:id="@+id/btnPlus50"
                 android:layout_width="0dp"
                 android:layout_height="28dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_overlay_btn"
                 android:gravity="center"
-                android:text="+20"
+                android:text="+50"
                 android:textColor="#FFCBD5E1"
                 android:textSize="11sp" />
         </LinearLayout>
@@ -189,7 +189,7 @@
             android:layout_marginTop="6dp"
             android:ellipsize="end"
             android:singleLine="true"
-            android:text="系数长按重置 · 拖动顶部移动"
+            android:text="跳近点+ · 跳远点- · 长按系数重置"
             android:textColor="#FF94A3B8"
             android:textSize="10sp" />
     </LinearLayout>

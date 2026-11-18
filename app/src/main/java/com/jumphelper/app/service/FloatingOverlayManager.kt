@@ -110,13 +110,25 @@ class FloatingOverlayManager(
         pieceY: Float,
         boardX: Float,
         boardY: Float,
-        pressMs: Long
+        pressMs: Long,
+        sourceWidth: Int = 0,
+        sourceHeight: Int = 0
     ) {
         if (!prefs.showDebugMarker) return
         ensureMarkerWindow()
-        markerOverlayView?.showMarkers(pieceX, pieceY, boardX, boardY, pressMs)
+        val bounds = getDisplayBounds()
+        val scaleX = if (sourceWidth > 0 && bounds.width() > 0) bounds.width() / sourceWidth.toFloat() else 1f
+        val scaleY = if (sourceHeight > 0 && bounds.height() > 0) bounds.height() / sourceHeight.toFloat() else 1f
+
+        markerOverlayView?.showMarkers(
+            rawPieceX = pieceX * scaleX,
+            rawPieceY = pieceY * scaleY,
+            rawBoardX = boardX * scaleX,
+            rawBoardY = boardY * scaleY,
+            pressDurationMs = pressMs
+        )
         mainHandler.removeCallbacks(clearMarkerRunnable)
-        mainHandler.postDelayed(clearMarkerRunnable, 550L)
+        mainHandler.postDelayed(clearMarkerRunnable, MARKER_DISPLAY_MS)
     }
 
     fun getControlBarRect(): Rect {
@@ -202,9 +214,9 @@ class FloatingOverlayManager(
         }
 
         tvLastJump?.text = if (pressMs > 0L) {
-            "上次: ${dist.toInt()}px → ${pressMs}ms · 长按系数重置"
+            "距${dist.toInt()}px → ${pressMs}ms · 跳近点+ 跳远点-"
         } else {
-            "系数长按重置1700 · 拖动顶部移动"
+            "跳近点+ · 跳远点- · 长按系数重置"
         }
     }
 
@@ -246,10 +258,10 @@ class FloatingOverlayManager(
 
         val dragHeader: View = root.findViewById(R.id.dragHeader)
         val btnCollapse: View = root.findViewById(R.id.btnCollapse)
-        val btnMinus20: View = root.findViewById(R.id.btnMinus20)
-        val btnMinus5: View = root.findViewById(R.id.btnMinus5)
-        val btnPlus5: View = root.findViewById(R.id.btnPlus5)
-        val btnPlus20: View = root.findViewById(R.id.btnPlus20)
+        val btnMinus50: View = root.findViewById(R.id.btnMinus50)
+        val btnMinus15: View = root.findViewById(R.id.btnMinus15)
+        val btnPlus15: View = root.findViewById(R.id.btnPlus15)
+        val btnPlus50: View = root.findViewById(R.id.btnPlus50)
 
         val bounds = getDisplayBounds()
         val initX = if (prefs.overlayX != Int.MIN_VALUE) {
@@ -286,13 +298,17 @@ class FloatingOverlayManager(
         btnSingleStep?.setOnClickListener { listener.onSingleStepRequested() }
         btnManualAim?.setOnClickListener { listener.onManualAimRequested() }
 
-        btnMinus20.setOnClickListener { adjustCoeff(-20) }
-        btnMinus5.setOnClickListener { adjustCoeff(-5) }
-        btnPlus5.setOnClickListener { adjustCoeff(5) }
-        btnPlus20.setOnClickListener { adjustCoeff(20) }
+        btnMinus50.setOnClickListener { adjustCoeff(-50) }
+        btnMinus15.setOnClickListener { adjustCoeff(-15) }
+        btnPlus15.setOnClickListener { adjustCoeff(15) }
+        btnPlus50.setOnClickListener { adjustCoeff(50) }
 
         tvCoeffOverlay?.setOnClickListener {
-            Toast.makeText(context, "长按系数可重置为 ${JumpDetector.DEFAULT_JUMP_FULL_WIDTH_MS}ms", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                context,
+                "跳近调大(+)、跳远调小(-)；长按重置为 ${JumpDetector.DEFAULT_JUMP_FULL_WIDTH_MS}ms",
+                Toast.LENGTH_SHORT
+            ).show()
         }
         tvCoeffOverlay?.setOnLongClickListener {
             prefs.jumpFullWidthMs = JumpDetector.DEFAULT_JUMP_FULL_WIDTH_MS
@@ -410,4 +426,8 @@ class FloatingOverlayManager(
         value.toFloat(),
         context.resources.displayMetrics
     ).toInt()
+
+    companion object {
+        private const val MARKER_DISPLAY_MS = 1250L
+    }
 }

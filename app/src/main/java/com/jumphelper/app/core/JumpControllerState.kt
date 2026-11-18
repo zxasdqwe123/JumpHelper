@@ -31,6 +31,9 @@ object JumpControllerState {
     private val _lastPressMs = MutableStateFlow(0L)
     val lastPressMs: StateFlow<Long> = _lastPressMs.asStateFlow()
 
+    private val _lastScreenshotSize = MutableStateFlow("")
+    val lastScreenshotSize: StateFlow<String> = _lastScreenshotSize.asStateFlow()
+
     private val _jumpFullWidthMs = MutableStateFlow(JumpDetector.DEFAULT_JUMP_FULL_WIDTH_MS)
     val jumpFullWidthMs: StateFlow<Int> = _jumpFullWidthMs.asStateFlow()
 
@@ -55,6 +58,12 @@ object JumpControllerState {
         )
     }
 
+    fun setScreenshotSize(width: Int, height: Int) {
+        if (width > 0 && height > 0) {
+            _lastScreenshotSize.value = "${width}×$height"
+        }
+    }
+
     fun updateStatus(text: String) {
         _lastStatusText.value = text
     }
@@ -70,5 +79,6 @@ object JumpControllerState {
         _jumpCount.value = 0
         _lastDistancePx.value = 0f
         _lastPressMs.value = 0L
+        _lastScreenshotSize.value = ""
     }
 }
