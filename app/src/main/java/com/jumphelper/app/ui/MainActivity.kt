@@ -231,7 +231,7 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
-                    combine(
+                    combine<Any, String>(
                         JumpControllerState.serviceConnected,
                         JumpControllerState.jumpCount,
                         JumpControllerState.lastStatusText,
