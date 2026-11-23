@@ -543,7 +543,7 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
                         gestureWatchdogRunnable = null
                         isCycleBusy = false
                         if (scheduleNextAuto && JumpControllerState.runMode.value == RunMode.AUTO_RUNNING) {
-                            ProcessDiagnostics.recordEvent(this, "手势回调 onCancelled")
+                            ProcessDiagnostics.recordEvent(this@JumpAccessibilityService, "手势回调 onCancelled")
                             pauseAll("手势被中断，已暂停")
                         }
                     }
