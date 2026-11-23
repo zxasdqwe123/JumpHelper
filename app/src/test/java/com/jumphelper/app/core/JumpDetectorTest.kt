@@ -205,6 +205,41 @@ class JumpDetectorTest {
         assertEquals(autoMs, manualMs)
     }
 
+    @Test
+    fun downscaled636x1400MatchesFull1272x2800PressTimeAndCenters() {
+        val fullW = 1272
+        val fullH = 2800
+        val fullPixels = createRadialVignetteBackground(fullW, fullH)
+        drawPawn(fullPixels, fullW, fullH, centerX = 368, bottomY = 1580, shortEdge = fullW)
+        drawDiamondBlock(fullPixels, fullW, fullH, centerX = 892, topY = 1044, halfWidth = 140, halfHeight = 82)
+
+        val fullOutcome = JumpDetector.detect(fullPixels, fullW, fullH, jumpFullWidthMs = 1700)
+        assertTrue(fullOutcome is JumpDetector.DetectionOutcome.Success)
+        val fullRes = (fullOutcome as JumpDetector.DetectionOutcome.Success).result
+
+        val halfW = fullW / 2
+        val halfH = fullH / 2
+        val halfPixels = IntArray(halfW * halfH)
+        for (y in 0 until halfH) {
+            val srcRow = (y * 2) * fullW
+            val dstRow = y * halfW
+            for (x in 0 until halfW) {
+                halfPixels[dstRow + x] = fullPixels[srcRow + x * 2]
+            }
+        }
+
+        val halfOutcome = JumpDetector.detect(halfPixels, halfW, halfH, jumpFullWidthMs = 1700)
+        assertTrue("Downscaled 636x1400 detection failed: $halfOutcome", halfOutcome is JumpDetector.DetectionOutcome.Success)
+        val halfRes = (halfOutcome as JumpDetector.DetectionOutcome.Success).result
+
+        assertEquals(fullRes.pieceX, halfRes.pieceX * 2f, 6f)
+        assertEquals(fullRes.boardX, halfRes.boardX * 2f, 8f)
+        assertTrue(
+            "Press time mismatch: full=${fullRes.pressTimeMs}ms vs half=${halfRes.pressTimeMs}ms",
+            abs(fullRes.pressTimeMs - halfRes.pressTimeMs) <= 10L
+        )
+    }
+
     private fun createGradientBackground(w: Int, h: Int): IntArray {
         val pixels = IntArray(w * h)
         for (y in 0 until h) {

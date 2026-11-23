@@ -34,7 +34,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="Android 16 单机适配 · 纯 Kotlin 像素识别（无 OpenCV）· 免 Root 免电脑"
+                android:text="Android 16–17 / ColorOS 17 适配 · 纯 Kotlin 像素识别（无 OpenCV）· 免 Root"
                 android:textColor="@color/text_secondary"
                 android:textSize="13sp" />
 
@@ -61,7 +61,7 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- Step 1: Android 13-16 Restricted Settings + Accessibility Guide -->
+        <!-- Step 1: Android 13-17 Restricted Settings + Accessibility Guide -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -73,7 +73,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="第一步：Android 13–16 权限引导"
+                android:text="第一步：Android 13–17 权限引导"
                 android:textColor="@color/text_primary"
                 android:textSize="16sp"
                 android:textStyle="bold" />
@@ -83,7 +83,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:lineSpacingExtra="3dp"
-                android:text="安卓 13–16 浏览器直装 APK 默认会限制无障碍权限。如点击开启时系统弹出「受限制的设置」，请按顺序操作："
+                android:text="安卓 13–17 浏览器直装 APK 默认会限制无障碍权限。如点击开启时系统弹出「受限制的设置」，请按顺序操作："
                 android:textColor="@color/text_secondary"
                 android:textSize="13sp" />
 
@@ -125,7 +125,7 @@
                 android:textSize="12sp" />
         </LinearLayout>
 
-        <!-- Step 2: Launch & Overlay Controls -->
+        <!-- Step 2: ColorOS 17 / Android 17 Keep-Alive -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -137,7 +137,116 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="第二步：启动游戏与悬浮控制条"
+                android:text="第二步：ColorOS 17 / Android 17 防杀后台保活"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvKeepAliveStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@color/status_warn_bg"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="8dp"
+                android:text="● 正在检查电池优化与前台保活状态..."
+                android:textColor="@color/accent_amber"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="前台常驻防杀通知（大幅降低自动连跳被杀概率）"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchForegroundKeepAlive"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnBatteryOptimization"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:text="1. 忽略电池优化"
+                    android:textAllCaps="false"
+                    android:textSize="13sp"
+                    app:backgroundTint="@color/accent_amber"
+                    app:cornerRadius="12dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnNotificationPermission"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:text="2. 开启通知权限"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
+                    app:cornerRadius="12dp"
+                    app:strokeColor="@color/stroke_subtle" />
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnBackgroundSettings"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="8dp"
+                android:text="3. 打开 ColorOS 耗电/后台自启动设置"
+                android:textAllCaps="false"
+                android:textColor="@color/accent_primary"
+                android:textSize="13sp"
+                app:cornerRadius="12dp"
+                app:strokeColor="@color/accent_primary" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@color/bg_card_alt"
+                android:lineSpacingExtra="4dp"
+                android:padding="12dp"
+                android:text="ColorOS 17 / 安卓 17 防杀必做 3 项：\n① 点上方按钮允许「忽略电池优化」并在应用详情 → 耗电管理中开启「允许完全后台行为」与「允许自启动」。\n② 划出最近任务界面，点跳一跳助手卡片右上角「⋮」→「🔒 锁定」。\n③ 若切到微信连跳仍被杀：到系统「设置 → 电池 → 省电设置」关闭「自适应电量」，且勿在游戏助手中开启深度清理后台。"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- Step 3: Launch & Overlay Controls -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/bg_card_surface"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="第三步：启动游戏与悬浮控制条"
                 android:textColor="@color/text_primary"
                 android:textSize="16sp"
                 android:textStyle="bold" />
@@ -207,7 +316,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="第三步：全面屏比例系数与连跳配置"
+                android:text="第四步：全面屏比例系数与连跳配置"
                 android:textColor="@color/text_primary"
                 android:textSize="16sp"
                 android:textStyle="bold" />
@@ -411,7 +520,7 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Step 4: Live Telemetry & Manual Fallback Guide -->
+        <!-- Step 5: Live Telemetry & Diagnostics -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -423,7 +532,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="运行状态与高分屏调校说明"
+                android:text="运行状态与系统杀后台诊断"
                 android:textColor="@color/text_primary"
                 android:textSize="16sp"
                 android:textStyle="bold" />
@@ -438,11 +547,36 @@
                 android:textSize="13sp" />
 
             <TextView
+                android:id="@+id/tvExitReason"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@color/bg_card_alt"
+                android:lineSpacingExtra="3dp"
+                android:padding="10dp"
+                android:text="暂无系统强杀或异常退出记录"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCopyDiagnostics"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="8dp"
+                android:text="复制诊断信息（排查被杀/崩溃原因）"
+                android:textAllCaps="false"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp"
+                app:cornerRadius="10dp"
+                app:strokeColor="@color/stroke_subtle" />
+
+            <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:lineSpacingExtra="3dp"
-                android:text="• 1.5K / P3 屏幕调校建议：开启准星标线，先点「⏭ 单步」观察青圈（棋子底座）和绿十字（目标顶面中心）是否对准；若准星准确但跳偏，跳近点悬浮条「+」，跳远点「-」。\n• 连跳节奏说明：已将默认连跳间隔提升至 2200~2800ms 并屏蔽边缘侧边栏与背景渐晕，确保落地弹跳与加分文字完全消失后再截下一帧。\n• 算法参考：wangshub/wechat_jump_game (Apache-2.0) wechat_jump_auto_slim.py 短边比例自适应思路。"
+                android:text="• 1.5K / P3 屏幕调校建议：开启准星标线，先点「⏭ 单步」观察青圈（棋子底座）和绿十字（目标顶面中心）是否对准；若准星准确但跳偏，跳近点悬浮条「+」，跳远点「-」。\n• 低内存与连跳优化：高分屏自动 2× sRGB 降采样并复用像素缓冲，大幅降低 Android 17 单应用内存峰值；默认连跳间隔 2200~2800ms。\n• 算法参考：wangshub/wechat_jump_game (Apache-2.0) wechat_jump_auto_slim.py 短边比例自适应思路。"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
         </LinearLayout>

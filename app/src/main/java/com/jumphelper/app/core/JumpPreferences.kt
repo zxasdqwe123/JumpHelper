@@ -56,6 +56,12 @@ class JumpPreferences(context: Context) {
             prefs.edit().putBoolean(KEY_SHOW_OVERLAY, value).apply()
         }
 
+    var foregroundKeepAlive: Boolean
+        get() = prefs.getBoolean(KEY_FOREGROUND_KEEP_ALIVE, true)
+        set(value) {
+            prefs.edit().putBoolean(KEY_FOREGROUND_KEEP_ALIVE, value).apply()
+        }
+
     var overlayX: Int
         get() = prefs.getInt(KEY_OVERLAY_X, Int.MIN_VALUE)
         set(value) {
@@ -91,6 +97,7 @@ class JumpPreferences(context: Context) {
         private const val KEY_MIN_INTERVAL_MS = "min_interval_ms"
         private const val KEY_DEBUG_MARKER = "debug_marker"
         private const val KEY_SHOW_OVERLAY = "show_overlay"
+        private const val KEY_FOREGROUND_KEEP_ALIVE = "foreground_keep_alive"
         private const val KEY_OVERLAY_X = "overlay_x"
         private const val KEY_OVERLAY_Y = "overlay_y"
     }

@@ -16,6 +16,9 @@ object JumpControllerState {
     private val _serviceConnected = MutableStateFlow(false)
     val serviceConnected: StateFlow<Boolean> = _serviceConnected.asStateFlow()
 
+    private val _foregroundActive = MutableStateFlow(false)
+    val foregroundActive: StateFlow<Boolean> = _foregroundActive.asStateFlow()
+
     private val _runMode = MutableStateFlow(RunMode.IDLE)
     val runMode: StateFlow<RunMode> = _runMode.asStateFlow()
 
@@ -40,11 +43,16 @@ object JumpControllerState {
     fun setServiceConnected(connected: Boolean) {
         _serviceConnected.value = connected
         if (!connected) {
+            _foregroundActive.value = false
             _runMode.value = RunMode.IDLE
             _lastStatusText.value = "无障碍服务未开启"
         } else {
             _lastStatusText.value = "待命"
         }
+    }
+
+    fun setForegroundActive(active: Boolean) {
+        _foregroundActive.value = active
     }
 
     fun setRunMode(mode: RunMode) {

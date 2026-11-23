@@ -61,7 +61,6 @@ class FloatingOverlayManager(
 
     @SuppressLint("InflateParams")
     fun attach() {
-        ensureMarkerWindow()
         ensureControlWindow()
         applyVisibilityFromPrefs()
         refreshUi()
@@ -89,9 +88,7 @@ class FloatingOverlayManager(
         params.x = dp(12)
         params.y = (bounds.height() * 0.14f).toInt()
         controlRootView?.let { view ->
-            if (view.isAttachedToWindow) {
-                windowManager.updateViewLayout(view, params)
-            }
+            safeUpdateViewLayout(view, params)
         }
     }
 
@@ -169,8 +166,12 @@ class FloatingOverlayManager(
             gravity = Gravity.TOP or Gravity.START
             layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
         }
-        windowManager.addView(aimView, params)
-        manualAimView = aimView
+        if (safeAddView(aimView, params)) {
+            manualAimView = aimView
+        } else {
+            applyVisibilityFromPrefs()
+            onCancelled()
+        }
     }
 
     fun removeManualAimOverlay() {
@@ -238,8 +239,9 @@ class FloatingOverlayManager(
             gravity = Gravity.TOP or Gravity.START
             layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
         }
-        windowManager.addView(marker, params)
-        markerOverlayView = marker
+        if (safeAddView(marker, params)) {
+            markerOverlayView = marker
+        }
     }
 
     @SuppressLint("InflateParams")
@@ -318,9 +320,10 @@ class FloatingOverlayManager(
             true
         }
 
-        windowManager.addView(root, params)
-        controlRootView = root
-        controlParams = params
+        if (safeAddView(root, params)) {
+            controlRootView = root
+            controlParams = params
+        }
     }
 
     private fun adjustCoeff(delta: Int) {
@@ -341,9 +344,7 @@ class FloatingOverlayManager(
         controlRootView?.let { view ->
             controlParams?.let { params ->
                 clampParamsToScreen(view, params)
-                if (view.isAttachedToWindow) {
-                    windowManager.updateViewLayout(view, params)
-                }
+                safeUpdateViewLayout(view, params)
             }
         }
     }
@@ -382,9 +383,7 @@ class FloatingOverlayManager(
                         params.x = startX + dx
                         params.y = startY + dy
                         clampParamsToScreen(root, params)
-                        if (root.isAttachedToWindow) {
-                            windowManager.updateViewLayout(root, params)
-                        }
+                        safeUpdateViewLayout(root, params)
                     }
                     true
                 }
@@ -410,6 +409,24 @@ class FloatingOverlayManager(
         val maxY = (bounds.height() - viewH).coerceAtLeast(0)
         params.x = params.x.coerceIn(0, maxX)
         params.y = params.y.coerceIn(0, maxY)
+    }
+
+    private fun safeAddView(view: View, params: WindowManager.LayoutParams): Boolean {
+        return try {
+            windowManager.addView(view, params)
+            true
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    private fun safeUpdateViewLayout(view: View, params: WindowManager.LayoutParams) {
+        try {
+            if (view.isAttachedToWindow) {
+                windowManager.updateViewLayout(view, params)
+            }
+        } catch (_: Throwable) {
+        }
     }
 
     private fun safeRemoveView(view: View) {
