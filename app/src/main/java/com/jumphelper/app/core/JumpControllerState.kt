@@ -8,6 +8,7 @@ enum class RunMode {
     IDLE,
     AUTO_RUNNING,
     PAUSED,
+    ESCORT_PAUSED,
     MANUAL_AIMING
 }
 
@@ -37,8 +38,20 @@ object JumpControllerState {
     private val _lastScreenshotSize = MutableStateFlow("")
     val lastScreenshotSize: StateFlow<String> = _lastScreenshotSize.asStateFlow()
 
-    private val _jumpFullWidthMs = MutableStateFlow(JumpDetector.DEFAULT_JUMP_FULL_WIDTH_MS)
+    private val _jumpFullWidthMs = MutableStateFlow(JumpDetector.RECOMMENDED_INITIAL_COEFF_MS)
     val jumpFullWidthMs: StateFlow<Int> = _jumpFullWidthMs.asStateFlow()
+
+    private val _pressOffsetMs = MutableStateFlow(JumpPreferences.DEFAULT_PRESS_OFFSET_MS)
+    val pressOffsetMs: StateFlow<Int> = _pressOffsetMs.asStateFlow()
+
+    private val _lastConfidence = MutableStateFlow(1f)
+    val lastConfidence: StateFlow<Float> = _lastConfidence.asStateFlow()
+
+    private val _lastStrategyTag = MutableStateFlow("")
+    val lastStrategyTag: StateFlow<String> = _lastStrategyTag.asStateFlow()
+
+    private val _calibrationSummary = MutableStateFlow("自校准待机")
+    val calibrationSummary: StateFlow<String> = _calibrationSummary.asStateFlow()
 
     fun setServiceConnected(connected: Boolean) {
         _serviceConnected.value = connected
@@ -66,6 +79,17 @@ object JumpControllerState {
         )
     }
 
+    fun setPressOffsetMs(value: Int) {
+        _pressOffsetMs.value = value.coerceIn(
+            JumpDetector.MIN_PRESS_OFFSET_MS,
+            JumpDetector.MAX_PRESS_OFFSET_MS
+        )
+    }
+
+    fun setCalibrationSummary(text: String) {
+        _calibrationSummary.value = text
+    }
+
     fun setScreenshotSize(width: Int, height: Int) {
         if (width > 0 && height > 0) {
             _lastScreenshotSize.value = "${width}×$height"
@@ -76,11 +100,19 @@ object JumpControllerState {
         _lastStatusText.value = text
     }
 
-    fun recordJump(distancePx: Float, pressMs: Long, status: String) {
+    fun recordJump(
+        distancePx: Float,
+        pressMs: Long,
+        status: String,
+        confidence: Float = 1f,
+        strategyTag: String = ""
+    ) {
         _jumpCount.value = _jumpCount.value + 1
         _lastDistancePx.value = distancePx
         _lastPressMs.value = pressMs
         _lastStatusText.value = status
+        _lastConfidence.value = confidence
+        _lastStrategyTag.value = strategyTag
     }
 
     fun resetSessionStats() {
@@ -88,5 +120,7 @@ object JumpControllerState {
         _lastDistancePx.value = 0f
         _lastPressMs.value = 0L
         _lastScreenshotSize.value = ""
+        _lastConfidence.value = 1f
+        _lastStrategyTag.value = ""
     }
 }

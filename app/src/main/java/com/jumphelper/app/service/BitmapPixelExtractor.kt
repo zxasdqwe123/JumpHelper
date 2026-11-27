@@ -41,6 +41,68 @@ object BitmapPixelExtractor {
         pressOffsetMs: Int = 0,
         usePhysicsCurve: Boolean = true
     ): JumpDetector.DetectionOutcome {
+        return withExtractedPixels(screenshotResult) { pixels, workWidth, workHeight, rawWidth, rawHeight ->
+            val outcome = JumpDetector.detect(
+                pixels = pixels,
+                width = workWidth,
+                height = workHeight,
+                jumpFullWidthMs = jumpFullWidthMs,
+                pressOffsetMs = pressOffsetMs,
+                usePhysicsCurve = usePhysicsCurve
+            )
+
+            if (outcome is JumpDetector.DetectionOutcome.Success &&
+                (workWidth != rawWidth || workHeight != rawHeight)
+            ) {
+                val sx = rawWidth / workWidth.toFloat()
+                val sy = rawHeight / workHeight.toFloat()
+                val rawShortEdge = min(rawWidth, rawHeight)
+                val r = outcome.result
+                JumpDetector.DetectionOutcome.Success(
+                    r.copy(
+                        pieceX = r.pieceX * sx,
+                        pieceY = r.pieceY * sy,
+                        boardX = r.boardX * sx,
+                        boardY = r.boardY * sy,
+                        boardTopY = r.boardTopY * sy,
+                        distanceX = r.distanceX * sx,
+                        effectiveDistance = r.effectiveDistance * sx,
+                        boardWidth = r.boardWidth * sx,
+                        currentBlockCenterX = r.currentBlockCenterX?.let { it * sx },
+                        currentBlockWidth = r.currentBlockWidth * sx,
+                        shortEdge = rawShortEdge,
+                        bitmapWidth = rawWidth,
+                        bitmapHeight = rawHeight
+                    )
+                )
+            } else {
+                outcome
+            }
+        } ?: JumpDetector.DetectionOutcome.Failure("无法解析截图缓冲区")
+    }
+
+    /**
+     * Lightweight piece-only extractor for 1-Tap Smart Rescue pre-aiming.
+     */
+    fun detectPieceOnly(
+        screenshotResult: AccessibilityService.ScreenshotResult
+    ): JumpDetector.PiecePosition? {
+        return withExtractedPixels(screenshotResult) { pixels, workWidth, workHeight, rawWidth, rawHeight ->
+            val pos = JumpDetector.detectPieceOnly(pixels, workWidth, workHeight) ?: return@withExtractedPixels null
+            if (workWidth != rawWidth || workHeight != rawHeight) {
+                val sx = rawWidth / workWidth.toFloat()
+                val sy = rawHeight / workHeight.toFloat()
+                JumpDetector.PiecePosition(pos.x * sx, pos.y * sy, rawWidth, rawHeight)
+            } else {
+                pos
+            }
+        }
+    }
+
+    private inline fun <T> withExtractedPixels(
+        screenshotResult: AccessibilityService.ScreenshotResult,
+        block: (pixels: IntArray, workWidth: Int, workHeight: Int, rawWidth: Int, rawHeight: Int) -> T
+    ): T? {
         val hardwareBuffer = screenshotResult.hardwareBuffer
         var bufferClosed = false
         var hardwareBitmap: Bitmap? = null
@@ -49,10 +111,10 @@ object BitmapPixelExtractor {
 
         return try {
             hardwareBitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, screenshotResult.colorSpace)
-                ?: return JumpDetector.DetectionOutcome.Failure("无法解析截图缓冲区")
+                ?: return null
 
             softwareBitmap = hardwareBitmap.copy(Bitmap.Config.ARGB_8888, false)
-                ?: return JumpDetector.DetectionOutcome.Failure("无法转换截图位图格式")
+                ?: return null
 
             // Release GPU HardwareBuffer immediately before doing CPU/canvas work
             hardwareBitmap.recycle()
@@ -79,7 +141,6 @@ object BitmapPixelExtractor {
                 val srcRect = Rect(0, 0, rawWidth, rawHeight)
                 val dstRect = Rect(0, 0, workWidth, workHeight)
                 Canvas(dest).drawBitmap(softwareBitmap, srcRect, dstRect, scalePaint)
-                // Free the large raw bitmap immediately before reading pixels into Java heap
                 softwareBitmap.recycle()
                 softwareBitmap = null
                 extractBitmap = dest
@@ -93,46 +154,15 @@ object BitmapPixelExtractor {
                     ?: IntArray(needed).also { reusablePixels = it }
                 extractBitmap.getPixels(pixels, 0, workWidth, 0, 0, workWidth, workHeight)
 
-                // Release all native bitmaps before running pixel scan
                 workBitmap?.recycle()
                 workBitmap = null
                 softwareBitmap?.recycle()
                 softwareBitmap = null
 
-                val outcome = JumpDetector.detect(
-                    pixels = pixels,
-                    width = workWidth,
-                    height = workHeight,
-                    jumpFullWidthMs = jumpFullWidthMs,
-                    pressOffsetMs = pressOffsetMs,
-                    usePhysicsCurve = usePhysicsCurve
-                )
-
-                if (outcome is JumpDetector.DetectionOutcome.Success &&
-                    (workWidth != rawWidth || workHeight != rawHeight)
-                ) {
-                    val sx = rawWidth / workWidth.toFloat()
-                    val sy = rawHeight / workHeight.toFloat()
-                    val r = outcome.result
-                    JumpDetector.DetectionOutcome.Success(
-                        r.copy(
-                            pieceX = r.pieceX * sx,
-                            pieceY = r.pieceY * sy,
-                            boardX = r.boardX * sx,
-                            boardY = r.boardY * sy,
-                            boardTopY = r.boardTopY * sy,
-                            distanceX = r.distanceX * sx,
-                            shortEdge = rawShortEdge,
-                            bitmapWidth = rawWidth,
-                            bitmapHeight = rawHeight
-                        )
-                    )
-                } else {
-                    outcome
-                }
+                block(pixels, workWidth, workHeight, rawWidth, rawHeight)
             }
-        } catch (t: Throwable) {
-            JumpDetector.DetectionOutcome.Failure("图像分析异常: ${t.message ?: "未知错误"}")
+        } catch (_: Throwable) {
+            null
         } finally {
             workBitmap?.recycle()
             softwareBitmap?.recycle()

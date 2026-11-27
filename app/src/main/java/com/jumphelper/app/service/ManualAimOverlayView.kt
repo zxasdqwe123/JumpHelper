@@ -15,27 +15,31 @@ import android.widget.LinearLayout
 import android.widget.TextView
 
 /**
- * Full-screen interactive aiming overlay for manual two-point fallback.
- * Step 1: tap piece base; Step 2: tap target block center.
+ * Full-screen interactive rescue overlay.
+ *
+ * When a pre-detected pawn position is supplied (1-Tap Smart Rescue), the start reticle is
+ * pre-locked on the pawn base so the user only needs a single tap on the target block center.
+ * Tapping "重选" anytime switches to classic 2-point selection.
  */
 class ManualAimOverlayView(
     context: Context,
+    initialPieceRawX: Float? = null,
+    initialPieceRawY: Float? = null,
     private val onPointsConfirmed: (x1: Float, y1: Float, x2: Float, y2: Float) -> Unit,
     private val onCancelled: () -> Unit
 ) : FrameLayout(context) {
 
-    private var hasStartPoint = false
-    private var startRawX = 0f
-    private var startRawY = 0f
-    private var startLocalX = 0f
-    private var startLocalY = 0f
+    private var hasStartPoint = initialPieceRawX != null && initialPieceRawY != null
+    private var startRawX = initialPieceRawX ?: 0f
+    private var startRawY = initialPieceRawY ?: 0f
 
     private val titleView: TextView
     private val resetBtn: TextView
     private val canvasView: AimCanvasView
+    private val screenLoc = IntArray(2)
 
     init {
-        setBackgroundColor(Color.argb(46, 0, 0, 0))
+        setBackgroundColor(Color.argb(42, 0, 0, 0))
 
         canvasView = AimCanvasView(context)
         addView(canvasView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
@@ -45,9 +49,9 @@ class ManualAimOverlayView(
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(12), dp(8), dp(12), dp(8))
             background = GradientDrawable().apply {
-                setColor(Color.argb(232, 15, 23, 42))
+                setColor(Color.argb(236, 15, 23, 42))
                 cornerRadius = dp(16).toFloat()
-                setStroke(dp(1), Color.argb(140, 56, 189, 248))
+                setStroke(dp(1), Color.argb(150, 56, 189, 248))
             }
         }
 
@@ -55,7 +59,11 @@ class ManualAimOverlayView(
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             paint.isFakeBoldText = true
-            text = "双点瞄准 (1/2)：点击【棋子底座】"
+            text = if (hasStartPoint) {
+                "一键救场：已锁棋子 · 点【目标中心】即跳"
+            } else {
+                "双点瞄准 (1/2)：点击【棋子底座】"
+            }
         }
         topBar.addView(titleView, LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
 
@@ -63,13 +71,13 @@ class ManualAimOverlayView(
             setTextColor(Color.rgb(251, 191, 36))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             paint.isFakeBoldText = true
-            text = "重选"
+            text = "重选起点"
             setPadding(dp(10), dp(5), dp(10), dp(5))
             background = GradientDrawable().apply {
                 setColor(Color.rgb(30, 41, 59))
                 cornerRadius = dp(10).toFloat()
             }
-            visibility = GONE
+            visibility = if (hasStartPoint) VISIBLE else GONE
             setOnClickListener {
                 resetSelection()
             }
@@ -123,7 +131,7 @@ class ManualAimOverlayView(
             style = Paint.Style.FILL
         }
         private val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(180, 34, 197, 94)
+            color = Color.argb(185, 34, 197, 94)
             strokeWidth = 4f
             style = Paint.Style.STROKE
             pathEffect = DashPathEffect(floatArrayOf(16f, 12f), 0f)
@@ -135,8 +143,6 @@ class ManualAimOverlayView(
                     hasStartPoint = true
                     startRawX = event.rawX
                     startRawY = event.rawY
-                    startLocalX = event.x
-                    startLocalY = event.y
                     titleView.text = "双点瞄准 (2/2)：点击【目标中心】即刻起跳"
                     resetBtn.visibility = VISIBLE
                     invalidate()
@@ -152,16 +158,21 @@ class ManualAimOverlayView(
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
             if (hasStartPoint) {
-                canvas.drawCircle(startLocalX, startLocalY, 32f, ringPaint)
-                canvas.drawLine(startLocalX - 46f, startLocalY, startLocalX + 46f, startLocalY, ringPaint)
-                canvas.drawLine(startLocalX, startLocalY - 46f, startLocalX, startLocalY + 46f, ringPaint)
-                canvas.drawCircle(startLocalX, startLocalY, 8f, centerPaint)
+                getLocationOnScreen(screenLoc)
+                val sx = startRawX - screenLoc[0].toFloat()
+                val sy = startRawY - screenLoc[1].toFloat()
+
+                canvas.drawCircle(sx, sy, 32f, ringPaint)
+                canvas.drawLine(sx - 46f, sy, sx + 46f, sy, ringPaint)
+                canvas.drawLine(sx, sy - 46f, sx, sy + 46f, ringPaint)
+                canvas.drawCircle(sx, sy, 8f, centerPaint)
+
                 // Draw subtle 30-degree isometric reference rays from start point to aid manual aiming
-                val rayLen = width * 0.45f
+                val rayLen = width * 0.48f
                 val dx = rayLen * 0.866f
                 val dy = rayLen * 0.5f
-                canvas.drawLine(startLocalX, startLocalY, startLocalX - dx, startLocalY - dy, guidePaint)
-                canvas.drawLine(startLocalX, startLocalY, startLocalX + dx, startLocalY - dy, guidePaint)
+                canvas.drawLine(sx, sy, sx - dx, sy - dy, guidePaint)
+                canvas.drawLine(sx, sy, sx + dx, sy - dy, guidePaint)
             }
         }
     }
@@ -169,6 +180,6 @@ class ManualAimOverlayView(
     private fun dp(value: Int): Int = TypedValue.applyDimension(
         TypedValue.COMPLEX_UNIT_DIP,
         value.toFloat(),
-        resources.displayMetrics
+        context.resources.displayMetrics
     ).toInt()
 }

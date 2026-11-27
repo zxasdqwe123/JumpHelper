@@ -8,7 +8,7 @@ import android.graphics.Paint
 import android.view.View
 
 /**
- * Non-touchable overlay that briefly displays detected piece and target markers.
+ * Non-touchable overlay that displays confidence-coded piece/target reticles and jump duration badge.
  */
 class MarkerOverlayView(context: Context) : View(context) {
 
@@ -16,7 +16,8 @@ class MarkerOverlayView(context: Context) : View(context) {
     private var pieceY = 0f
     private var boardX = 0f
     private var boardY = 0f
-    private var pressMs = 0L
+    private var badgeText = ""
+    private var targetColor = COLOR_HIGH_CONF
     private var hasMarker = false
 
     private val screenLoc = IntArray(2)
@@ -35,24 +36,30 @@ class MarkerOverlayView(context: Context) : View(context) {
     }
 
     private val targetPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.rgb(34, 197, 94)
+        color = COLOR_HIGH_CONF
         strokeWidth = 5f
         style = Paint.Style.STROKE
     }
 
     private val fillDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.rgb(34, 197, 94)
+        color = COLOR_HIGH_CONF
         style = Paint.Style.FILL
     }
 
     private val badgeBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(220, 15, 23, 42)
+        color = Color.argb(228, 15, 23, 42)
         style = Paint.Style.FILL
+    }
+
+    private val badgeStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = COLOR_HIGH_CONF
+        strokeWidth = 2.5f
+        style = Paint.Style.STROKE
     }
 
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
-        textSize = 34f
+        textSize = 33f
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
     }
@@ -62,13 +69,32 @@ class MarkerOverlayView(context: Context) : View(context) {
         rawPieceY: Float,
         rawBoardX: Float,
         rawBoardY: Float,
-        pressDurationMs: Long
+        pressDurationMs: Long,
+        confidence: Float = 0.90f,
+        isWhiteDot: Boolean = false,
+        isEscortWarning: Boolean = false
     ) {
         pieceX = rawPieceX
         pieceY = rawPieceY
         boardX = rawBoardX
         boardY = rawBoardY
-        pressMs = pressDurationMs
+
+        targetColor = when {
+            isEscortWarning || confidence < 0.48f -> COLOR_LOW_CONF
+            confidence < 0.78f -> COLOR_MED_CONF
+            else -> COLOR_HIGH_CONF
+        }
+        targetPaint.color = targetColor
+        fillDotPaint.color = targetColor
+        badgeStrokePaint.color = targetColor
+
+        badgeText = when {
+            isEscortWarning -> "⚠ 复杂块 · 点救场"
+            isWhiteDot -> "🎯 ${pressDurationMs}ms"
+            confidence < 0.78f -> "注意 · ${pressDurationMs}ms"
+            else -> "${pressDurationMs}ms"
+        }
+
         hasMarker = true
         visibility = VISIBLE
         invalidate()
@@ -104,12 +130,18 @@ class MarkerOverlayView(context: Context) : View(context) {
         canvas.drawLine(bx, by - 36f, bx, by + 36f, targetPaint)
         canvas.drawCircle(bx, by, 6f, fillDotPaint)
 
-        // Duration pill near midpoint
+        // Duration / confidence pill near midpoint
         val midX = (px + bx) / 2f
-        val midY = (py + by) / 2f - 44f
-        val label = "${pressMs}ms"
-        val halfW = textPaint.measureText(label) / 2f + 22f
-        canvas.drawRoundRect(midX - halfW, midY - 34f, midX + halfW, midY + 14f, 20f, 20f, badgeBgPaint)
-        canvas.drawText(label, midX, midY, textPaint)
+        val midY = (py + by) / 2f - 46f
+        val halfW = textPaint.measureText(badgeText) / 2f + 24f
+        canvas.drawRoundRect(midX - halfW, midY - 35f, midX + halfW, midY + 14f, 22f, 22f, badgeBgPaint)
+        canvas.drawRoundRect(midX - halfW, midY - 35f, midX + halfW, midY + 14f, 22f, 22f, badgeStrokePaint)
+        canvas.drawText(badgeText, midX, midY, textPaint)
+    }
+
+    companion object {
+        private val COLOR_HIGH_CONF = Color.rgb(34, 197, 94)
+        private val COLOR_MED_CONF = Color.rgb(245, 158, 11)
+        private val COLOR_LOW_CONF = Color.rgb(239, 68, 68)
     }
 }

@@ -18,6 +18,7 @@ import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import androidx.core.app.NotificationCompat
 import com.jumphelper.app.R
+import com.jumphelper.app.core.AutoCalibrator
 import com.jumphelper.app.core.JumpControllerState
 import com.jumphelper.app.core.JumpDetector
 import com.jumphelper.app.core.JumpPreferences
@@ -30,8 +31,17 @@ import kotlin.random.Random
 
 class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.OverlayActionListener {
 
+    private data class CachedPiece(
+        val x: Float,
+        val y: Float,
+        val sourceWidth: Int,
+        val sourceHeight: Int,
+        val timestampMs: Long
+    )
+
     private lateinit var prefs: JumpPreferences
     private lateinit var overlayManager: FloatingOverlayManager
+    private lateinit var autoCalibrator: AutoCalibrator
     private val mainHandler = Handler(Looper.getMainLooper())
     private val workerExecutor: ExecutorService = Executors.newSingleThreadExecutor()
 
@@ -40,6 +50,8 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
     private var screenshotRetryCount = 0
     private var activeCaptureToken = 0L
     private var activeGestureToken = 0L
+    private var lastDispatchedPressMs = 0L
+    private var cachedEscortPiece: CachedPiece? = null
 
     private var captureTimeoutRunnable: Runnable? = null
     private var gestureWatchdogRunnable: Runnable? = null
@@ -54,7 +66,17 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
         super.onServiceConnected()
         instance = this
         prefs = JumpPreferences(this)
+        autoCalibrator = AutoCalibrator(initialSamples = prefs.calibrationSamples)
+
         JumpControllerState.setJumpFullWidthMs(prefs.jumpFullWidthMs)
+        JumpControllerState.setPressOffsetMs(prefs.pressOffsetMs)
+        JumpControllerState.setCalibrationSummary(
+            if (prefs.autoCalibrateEnabled) {
+                if (prefs.calibrationSamples >= 4) "自校准已收敛 (${prefs.calibrationSamples}次)" else "自校准待机"
+            } else {
+                "自校准已关闭"
+            }
+        )
         JumpControllerState.setServiceConnected(true)
 
         if (::overlayManager.isInitialized) {
@@ -106,6 +128,10 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
         captureTimeoutRunnable = null
         gestureWatchdogRunnable = null
         isCycleBusy = false
+        cachedEscortPiece = null
+        if (::autoCalibrator.isInitialized) {
+            autoCalibrator.clearPending()
+        }
         BitmapPixelExtractor.clearCache()
         stopForegroundKeepAlive()
         if (::overlayManager.isInitialized) {
@@ -212,7 +238,8 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
         val coeff = JumpControllerState.jumpFullWidthMs.value
         return when (JumpControllerState.runMode.value) {
             RunMode.AUTO_RUNNING -> "自动连跳中 · 累计 ${count} 跳 · 系数 ${coeff}ms"
-            RunMode.MANUAL_AIMING -> "双点瞄准中 · 累计 ${count} 跳"
+            RunMode.ESCORT_PAUSED -> "复杂方块已暂停护航 · 累计 ${count} 跳"
+            RunMode.MANUAL_AIMING -> "一键救场瞄准中 · 累计 ${count} 跳"
             else -> "悬浮控制条待命 · 累计 ${count} 跳 · 系数 ${coeff}ms"
         }
     }
@@ -220,9 +247,28 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
     fun refreshOverlayFromPrefs() {
         if (!::overlayManager.isInitialized) return
         JumpControllerState.setJumpFullWidthMs(prefs.jumpFullWidthMs)
+        JumpControllerState.setPressOffsetMs(prefs.pressOffsetMs)
+        if (!prefs.autoCalibrateEnabled) {
+            JumpControllerState.setCalibrationSummary("自校准已关闭")
+        }
         ensureForegroundKeepAlive()
         overlayManager.applyVisibilityFromPrefs()
         overlayManager.refreshUi()
+    }
+
+    fun resetAutoCalibration() {
+        if (!::prefs.isInitialized) return
+        prefs.resetCalibration()
+        if (::autoCalibrator.isInitialized) {
+            autoCalibrator.resetLearning()
+        }
+        JumpControllerState.setJumpFullWidthMs(prefs.jumpFullWidthMs)
+        JumpControllerState.setPressOffsetMs(prefs.pressOffsetMs)
+        JumpControllerState.setCalibrationSummary("自校准已重置")
+        if (::overlayManager.isInitialized) {
+            overlayManager.refreshUi()
+        }
+        ensureForegroundKeepAlive()
     }
 
     fun resetOverlayPosition() {
@@ -243,6 +289,7 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
     override fun onSingleStepRequested() {
         if (isCycleBusy) return
         mainHandler.removeCallbacks(scheduledAutoStep)
+        cachedEscortPiece = null
         JumpControllerState.setRunMode(RunMode.PAUSED)
         JumpControllerState.updateStatus("单步识别中")
         ensureForegroundKeepAlive("单步识别中")
@@ -253,14 +300,97 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
     override fun onManualAimRequested() {
         mainHandler.removeCallbacks(scheduledAutoStep)
         cancelPendingWatchdogs()
+        activeCaptureToken++
+        activeGestureToken++
         isCycleBusy = false
+        if (::autoCalibrator.isInitialized) {
+            autoCalibrator.clearPending()
+        }
         JumpControllerState.setRunMode(RunMode.MANUAL_AIMING)
-        JumpControllerState.updateStatus("双点瞄准")
-        ensureForegroundKeepAlive("双点瞄准中")
+        JumpControllerState.updateStatus("一键救场准备中")
+        ensureForegroundKeepAlive("一键救场瞄准中")
         overlayManager.refreshUi()
 
+        val freshCached = cachedEscortPiece?.takeIf {
+            System.currentTimeMillis() - it.timestampMs <= ESCORT_PIECE_CACHE_TTL_MS
+        }
+        if (freshCached != null) {
+            val (rawX, rawY) = scaleToDisplay(freshCached.x, freshCached.y, freshCached.sourceWidth, freshCached.sourceHeight)
+            openManualAimOverlay(rawX, rawY)
+            return
+        }
+
+        // Fast piece-only capture so 1-Tap Smart Rescue pre-locks the pawn automatically
+        val token = ++activeCaptureToken
+        val needHideBar = overlayManager.doesControlBarOverlapScanArea()
+        overlayManager.setHiddenForCapture(true, hideControlBar = needHideBar)
+        val settleMs = if (needHideBar) OVERLAY_HIDE_SETTLE_MS else 0L
+
+        val fallbackOpen = Runnable {
+            if (token != activeCaptureToken) return@Runnable
+            activeCaptureToken++
+            overlayManager.setHiddenForCapture(false)
+            openManualAimOverlay(null, null)
+        }
+        captureTimeoutRunnable = fallbackOpen
+        mainHandler.postDelayed(fallbackOpen, settleMs + PIECE_PRELOCK_TIMEOUT_MS)
+
+        mainHandler.postDelayed({
+            if (token != activeCaptureToken) return@postDelayed
+            try {
+                takeScreenshot(
+                    Display.DEFAULT_DISPLAY,
+                    workerExecutor,
+                    object : TakeScreenshotCallback {
+                        override fun onSuccess(screenshot: ScreenshotResult) {
+                            if (token != activeCaptureToken) {
+                                try {
+                                    screenshot.hardwareBuffer.close()
+                                } catch (_: Throwable) {
+                                }
+                                return
+                            }
+                            val piece = BitmapPixelExtractor.detectPieceOnly(screenshot)
+                            mainHandler.post {
+                                if (token != activeCaptureToken) return@post
+                                captureTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+                                captureTimeoutRunnable = null
+                                overlayManager.setHiddenForCapture(false)
+                                if (piece != null) {
+                                    val (rx, ry) = scaleToDisplay(piece.x, piece.y, piece.bitmapWidth, piece.bitmapHeight)
+                                    openManualAimOverlay(rx, ry)
+                                } else {
+                                    openManualAimOverlay(null, null)
+                                }
+                            }
+                        }
+
+                        override fun onFailure(errorCode: Int) {
+                            mainHandler.post {
+                                if (token != activeCaptureToken) return@post
+                                captureTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+                                captureTimeoutRunnable = null
+                                overlayManager.setHiddenForCapture(false)
+                                openManualAimOverlay(null, null)
+                            }
+                        }
+                    }
+                )
+            } catch (_: Throwable) {
+                captureTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+                captureTimeoutRunnable = null
+                overlayManager.setHiddenForCapture(false)
+                openManualAimOverlay(null, null)
+            }
+        }, settleMs)
+    }
+
+    private fun openManualAimOverlay(prelockX: Float?, prelockY: Float?) {
         overlayManager.showManualAimOverlay(
+            initialPieceRawX = prelockX,
+            initialPieceRawY = prelockY,
             onPointsConfirmed = { x1, y1, x2, y2 ->
+                cachedEscortPiece = null
                 val bounds = overlayManager.getDisplayBounds()
                 val pressMs = JumpDetector.calculateManualPressTimeMs(
                     x1 = x1,
@@ -276,18 +406,18 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
                 val distPx = kotlin.math.abs(x2 - x1)
                 isCycleBusy = true
                 JumpControllerState.setRunMode(RunMode.PAUSED)
-                JumpControllerState.recordJump(distPx, pressMs, "手动跳跃")
+                JumpControllerState.recordJump(distPx, pressMs, "救场起跳", confidence = 1f, strategyTag = "手动")
                 ensureForegroundKeepAlive()
                 overlayManager.refreshUi()
-                overlayManager.showDetectionMarkers(x1, y1, x2, y2, pressMs)
+                overlayManager.showDetectionMarkers(x1, y1, x2, y2, pressMs, confidence = 1f)
 
                 mainHandler.postDelayed({
                     dispatchRandomizedLongPress(pressMs, scheduleNextAuto = false)
-                }, 70L)
+                }, 60L)
             },
             onCancelled = {
                 JumpControllerState.setRunMode(RunMode.PAUSED)
-                JumpControllerState.updateStatus("已取消瞄准")
+                JumpControllerState.updateStatus("已取消救场")
                 ensureForegroundKeepAlive()
                 overlayManager.refreshUi()
             }
@@ -295,12 +425,16 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
     }
 
     override fun onCoefficientAdjusted(newCoeffMs: Int) {
+        if (::autoCalibrator.isInitialized) {
+            autoCalibrator.clearPending()
+        }
         ensureForegroundKeepAlive()
     }
 
     private fun startAutoLoop() {
         mainHandler.removeCallbacks(scheduledAutoStep)
         screenshotRetryCount = 0
+        cachedEscortPiece = null
         JumpControllerState.setRunMode(RunMode.AUTO_RUNNING)
         JumpControllerState.updateStatus("自动连跳中")
         ensureForegroundKeepAlive()
@@ -311,14 +445,20 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
         }
     }
 
-    private fun pauseAll(statusText: String) {
+    private fun pauseAll(statusText: String, mode: RunMode = RunMode.PAUSED) {
         activeCaptureToken++
         activeGestureToken++
         mainHandler.removeCallbacks(scheduledAutoStep)
         cancelPendingWatchdogs()
         isCycleBusy = false
+        if (mode != RunMode.ESCORT_PAUSED) {
+            cachedEscortPiece = null
+            if (::autoCalibrator.isInitialized) {
+                autoCalibrator.clearPending()
+            }
+        }
         BitmapPixelExtractor.clearCache()
-        JumpControllerState.setRunMode(RunMode.PAUSED)
+        JumpControllerState.setRunMode(mode)
         JumpControllerState.updateStatus(statusText)
         ensureForegroundKeepAlive()
         if (::overlayManager.isInitialized) {
@@ -340,8 +480,15 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
         isCycleBusy = true
         val token = ++activeCaptureToken
 
-        // Hide floating overlay briefly so SurfaceFlinger captures pure game pixels
-        overlayManager.setHiddenForCapture(true)
+        // Zero-flicker optimization: only hide control bar if it physically overlaps the scan region!
+        val needHideBar = overlayManager.doesControlBarOverlapScanArea()
+        val hadMarkers = overlayManager.hasVisibleMarkers()
+        overlayManager.setHiddenForCapture(true, hideControlBar = needHideBar)
+        val settleMs = when {
+            needHideBar -> OVERLAY_HIDE_SETTLE_MS
+            hadMarkers -> MARKER_CLEAR_SETTLE_MS
+            else -> 0L
+        }
 
         val timeoutRunnable = Runnable {
             if (token != activeCaptureToken || !isCycleBusy) return@Runnable
@@ -363,18 +510,18 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
             }
         }
         captureTimeoutRunnable = timeoutRunnable
-        mainHandler.postDelayed(timeoutRunnable, OVERLAY_HIDE_SETTLE_MS + SCREENSHOT_TIMEOUT_MS)
+        mainHandler.postDelayed(timeoutRunnable, settleMs + SCREENSHOT_TIMEOUT_MS)
 
-        mainHandler.postDelayed({
+        val captureTask = Runnable {
             if (token != activeCaptureToken) {
                 overlayManager.setHiddenForCapture(false)
-                return@postDelayed
+                return@Runnable
             }
             if (isAutoLoop && JumpControllerState.runMode.value != RunMode.AUTO_RUNNING) {
                 cancelPendingWatchdogs()
                 overlayManager.setHiddenForCapture(false)
                 isCycleBusy = false
-                return@postDelayed
+                return@Runnable
             }
 
             try {
@@ -427,7 +574,13 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
                 ProcessDiagnostics.recordEvent(this, "截图调用异常: ${t.javaClass.simpleName}")
                 pauseAll("截图调用异常")
             }
-        }, OVERLAY_HIDE_SETTLE_MS)
+        }
+
+        if (settleMs > 0L) {
+            mainHandler.postDelayed(captureTask, settleMs)
+        } else {
+            captureTask.run()
+        }
     }
 
     private fun handleScreenshotFailure(errorCode: Int, isAutoLoop: Boolean) {
@@ -471,14 +624,97 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
         when (outcome) {
             is JumpDetector.DetectionOutcome.Failure -> {
                 isCycleBusy = false
+                if (outcome.isGameOverScreen) {
+                    ProcessDiagnostics.recordEvent(this, "检测到结算界面，自动暂停")
+                }
                 pauseAll(outcome.reason)
             }
             is JumpDetector.DetectionOutcome.Success -> {
                 screenshotRetryCount = 0
                 val res = outcome.result
                 JumpControllerState.setScreenshotSize(res.bitmapWidth, res.bitmapHeight)
+
+                // Step 1: Run zero-extra-screenshot closed-loop calibration using previous jump's landing
+                val calOutcome = autoCalibrator.evaluateLandingAndUpdate(
+                    currentResult = res,
+                    currentCoeffMs = prefs.jumpFullWidthMs,
+                    currentOffsetMs = prefs.pressOffsetMs,
+                    usePhysicsCurve = prefs.usePhysicsCurve,
+                    enabled = prefs.autoCalibrateEnabled
+                )
+                if (calOutcome.applied) {
+                    prefs.jumpFullWidthMs = calOutcome.newCoeffMs
+                    prefs.pressOffsetMs = calOutcome.newOffsetMs
+                    prefs.calibrationSamples = calOutcome.sampleCount
+                    JumpControllerState.setJumpFullWidthMs(calOutcome.newCoeffMs)
+                    JumpControllerState.setPressOffsetMs(calOutcome.newOffsetMs)
+                } else if (calOutcome.isBullseye) {
+                    prefs.calibrationSamples = calOutcome.sampleCount
+                }
+                JumpControllerState.setCalibrationSummary(calOutcome.summaryText)
+
+                // Recompute press duration immediately so THIS jump benefits from updated calibration
+                val finalPressMs = if (calOutcome.applied) {
+                    JumpDetector.calculateAutoPressTimeMs(
+                        distanceX = res.effectiveDistance,
+                        shortEdge = res.shortEdge,
+                        jumpFullWidthMs = prefs.jumpFullWidthMs,
+                        pressOffsetMs = prefs.pressOffsetMs,
+                        usePhysicsCurve = prefs.usePhysicsCurve
+                    )
+                } else {
+                    res.pressTimeMs
+                }
+
+                val isWhiteDot = res.strategy == JumpDetector.DetectionStrategy.WHITE_DOT
+
+                // Step 2: Smart Escort protection — pause automatically on extreme low-confidence weird blocks
+                if (isAutoLoop &&
+                    prefs.smartEscortEnabled &&
+                    res.confidence < JumpDetector.SMART_ESCORT_CONFIDENCE_THRESHOLD
+                ) {
+                    cachedEscortPiece = CachedPiece(
+                        x = res.pieceX,
+                        y = res.pieceY,
+                        sourceWidth = res.bitmapWidth,
+                        sourceHeight = res.bitmapHeight,
+                        timestampMs = System.currentTimeMillis()
+                    )
+                    ProcessDiagnostics.recordEvent(
+                        this,
+                        "智能护航暂停(conf=${String.format("%.2f", res.confidence)}, strategy=${res.strategy})"
+                    )
+                    pauseAll("复杂方块已暂停", mode = RunMode.ESCORT_PAUSED)
+                    overlayManager.showDetectionMarkers(
+                        pieceX = res.pieceX,
+                        pieceY = res.pieceY,
+                        boardX = res.boardX,
+                        boardY = res.boardY,
+                        pressMs = finalPressMs,
+                        sourceWidth = res.bitmapWidth,
+                        sourceHeight = res.bitmapHeight,
+                        confidence = res.confidence,
+                        isWhiteDot = false,
+                        isEscortWarning = true
+                    )
+                    return
+                }
+
+                // Step 3: Record executed jump & dispatch gesture
+                cachedEscortPiece = null
+                val strategyTag = when {
+                    isWhiteDot -> "🎯靶心"
+                    res.confidence >= 0.78f -> "精准"
+                    else -> "注意"
+                }
                 val statusLabel = if (isAutoLoop) "连跳中" else "单步完成"
-                JumpControllerState.recordJump(res.distanceX, res.pressTimeMs, statusLabel)
+                JumpControllerState.recordJump(
+                    distancePx = res.effectiveDistance,
+                    pressMs = finalPressMs,
+                    status = statusLabel,
+                    confidence = res.confidence,
+                    strategyTag = strategyTag
+                )
                 ensureForegroundKeepAlive()
                 overlayManager.refreshUi()
                 overlayManager.showDetectionMarkers(
@@ -486,11 +722,16 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
                     pieceY = res.pieceY,
                     boardX = res.boardX,
                     boardY = res.boardY,
-                    pressMs = res.pressTimeMs,
+                    pressMs = finalPressMs,
                     sourceWidth = res.bitmapWidth,
-                    sourceHeight = res.bitmapHeight
+                    sourceHeight = res.bitmapHeight,
+                    confidence = res.confidence,
+                    isWhiteDot = isWhiteDot,
+                    isEscortWarning = false
                 )
-                dispatchRandomizedLongPress(res.pressTimeMs, scheduleNextAuto = isAutoLoop)
+
+                autoCalibrator.recordExecutedJump(res, finalPressMs)
+                dispatchRandomizedLongPress(finalPressMs, scheduleNextAuto = isAutoLoop)
             }
         }
     }
@@ -514,6 +755,7 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
         val stroke = GestureDescription.StrokeDescription(path, 0L, pressTimeMs)
         val gesture = GestureDescription.Builder().addStroke(stroke).build()
         val gestureToken = ++activeGestureToken
+        lastDispatchedPressMs = pressTimeMs
 
         val fallbackWatchdog = Runnable {
             if (gestureToken != activeGestureToken || !isCycleBusy) return@Runnable
@@ -567,9 +809,18 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
         if (scheduleNextAuto && JumpControllerState.runMode.value == RunMode.AUTO_RUNNING) {
             val minWait = prefs.minIntervalMs
             val maxWait = prefs.maxIntervalMs
-            val nextWait = Random.nextInt(minWait, maxWait + 1).toLong()
-            mainHandler.postDelayed(scheduledAutoStep, nextWait)
+            val baseWait = Random.nextInt(minWait, maxWait + 1).toLong()
+            // Flight-aware cushion: long jumps spend more time flying & panning camera
+            val flightCushion = ((lastDispatchedPressMs - 560L).coerceIn(0L, 420L) * 0.65f).toLong()
+            mainHandler.postDelayed(scheduledAutoStep, baseWait + flightCushion)
         }
+    }
+
+    private fun scaleToDisplay(x: Float, y: Float, sourceW: Int, sourceH: Int): Pair<Float, Float> {
+        val bounds = overlayManager.getDisplayBounds()
+        val sx = if (sourceW > 0 && bounds.width() > 0) bounds.width() / sourceW.toFloat() else 1f
+        val sy = if (sourceH > 0 && bounds.height() > 0) bounds.height() / sourceH.toFloat() else 1f
+        return (x * sx) to (y * sy)
     }
 
     private fun pickSafePressCoordinate(w: Int, h: Int, barRect: Rect): Pair<Float, Float> {
@@ -586,14 +837,16 @@ class JumpAccessibilityService : AccessibilityService(), FloatingOverlayManager.
                 return rx to ry
             }
         }
-        // Fallback outside bar if control bar sits directly inside bottom area
         val fallbackY = if (barRect.centerY() > h * 0.68f) h * 0.54f else h * 0.76f
         return (w * 0.5f) to fallbackY
     }
 
     companion object {
-        private const val OVERLAY_HIDE_SETTLE_MS = 120L
+        private const val OVERLAY_HIDE_SETTLE_MS = 110L
+        private const val MARKER_CLEAR_SETTLE_MS = 45L
         private const val SCREENSHOT_TIMEOUT_MS = 3500L
+        private const val PIECE_PRELOCK_TIMEOUT_MS = 650L
+        private const val ESCORT_PIECE_CACHE_TTL_MS = 20_000L
         private const val GESTURE_WATCHDOG_EXTRA_MS = 2200L
         private const val KEEP_ALIVE_CHANNEL_ID = "jump_helper_keep_alive"
         private const val KEEP_ALIVE_NOTIFICATION_ID = 1001

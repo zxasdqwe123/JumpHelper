@@ -304,7 +304,7 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Step 3: Algorithm Tuning -->
+        <!-- Step 4: V2.0 Smart Algorithm & Auto-Calibration -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -316,17 +316,154 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="第四步：全面屏比例系数与连跳配置"
+                android:text="第四步：V2.0 智能识别与无感自校准"
                 android:textColor="@color/text_primary"
                 android:textSize="16sp"
                 android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="智能闭环自校准（观察落地偏心，自动调准参数）"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchAutoCalibrate"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="复杂方块防摔护航（极端低把握自动暂停，点救场接管）"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchSmartEscort"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@color/bg_card_alt"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="8dp">
+
+                <TextView
+                    android:id="@+id/tvCalibrationStatus"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="自校准状态：待机（开跳后自动学习）"
+                    android:textColor="@color/accent_emerald"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnResetCalibration"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="34dp"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="10dp"
+                    android:paddingVertical="0dp"
+                    android:text="重置校准"
+                    android:textSize="11sp"
+                    app:cornerRadius="8dp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvIntervalValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:text="连跳节奏等待：1450 ~ 1850 ms（长跳自动补缓冲）"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTempoTurbo"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:padding="0dp"
+                    android:text="⚡ 极速"
+                    android:textSize="12sp"
+                    app:cornerRadius="10dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTempoBalanced"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:padding="0dp"
+                    android:text="⚖ 均衡(推荐)"
+                    android:textSize="12sp"
+                    app:cornerRadius="10dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTempoSteady"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_weight="1"
+                    android:padding="0dp"
+                    android:text="🛡 稳健"
+                    android:textSize="12sp"
+                    app:cornerRadius="10dp" />
+            </LinearLayout>
+
+            <SeekBar
+                android:id="@+id/seekInterval"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:max="2650"
+                android:progress="500" />
 
             <TextView
                 android:id="@+id/tvCoeffValue"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="满短边蓄力系数：1700 ms (1.00x)"
+                android:layout_marginTop="12dp"
+                android:text="满短边蓄力系数：1740 ms (1.02x)"
                 android:textColor="@color/accent_primary"
                 android:textSize="14sp"
                 android:textStyle="bold" />
@@ -335,7 +472,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="按压时长 = 系数 × (水平像素差 / 屏幕短边)。跳远了调小，跳近了调大。"
+                android:text="默认由自校准自动微调，也可随时手动覆盖（跳近调大，跳远调小）。"
                 android:textColor="@color/text_muted"
                 android:textSize="12sp" />
 
@@ -345,7 +482,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:max="1800"
-                android:progress="700" />
+                android:progress="740" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -373,7 +510,7 @@
                     android:layout_marginEnd="6dp"
                     android:layout_weight="1"
                     android:padding="0dp"
-                    android:text="恢复 1700"
+                    android:text="恢复 1740"
                     android:textSize="12sp"
                     app:cornerRadius="10dp" />
 
@@ -425,7 +562,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="若近距离和远距离都固定偏近或偏远，微调此补偿（-120~+120ms）。"
+                android:text="补偿系统手势启停固定延迟（-120~+120ms），自校准也会自动微调此项。"
                 android:textColor="@color/text_muted"
                 android:textSize="12sp" />
 
@@ -479,28 +616,10 @@
                     app:cornerRadius="10dp" />
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/tvIntervalValue"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:text="连跳随机等待：2200 ~ 2800 ms"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp"
-                android:textStyle="bold" />
-
-            <SeekBar
-                android:id="@+id/seekInterval"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:max="2600"
-                android:progress="1000" />
-
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="10dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
@@ -508,7 +627,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="识别后显示棋子与落点准星标线（1.25秒）"
+                    android:text="显示三色置信度准星与靶心标线（绿稳/黄注意/红警）"
                     android:textColor="@color/text_secondary"
                     android:textSize="13sp" />
 
@@ -576,7 +695,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:lineSpacingExtra="3dp"
-                android:text="• 1.5K / P3 屏幕调校建议：开启准星标线，先点「⏭ 单步」观察青圈（棋子底座）和绿十字（目标顶面中心）是否对准；若准星准确但跳偏，跳近点悬浮条「+」，跳远点「-」。\n• 低内存与连跳优化：高分屏自动 2× sRGB 降采样并复用像素缓冲，大幅降低 Android 17 单应用内存峰值；默认连跳间隔 2200~2800ms。\n• 算法参考：wangshub/wechat_jump_game (Apache-2.0) wechat_jump_auto_slim.py 短边比例自适应思路。"
+                android:text="• V2.0 智能引擎：物理阴影剥离 + 双拐点几何拟合（抗魔方/长凳/圆桌/屋顶）+ 白点靶心锁死 + 3D 等距反投影 + 无感闭环自校准。\n• 零闪烁体验：将悬浮条放在屏幕底部即可零闪烁截图；遇极端复杂方块自动红框护航暂停，点「🎯 救场」轻点目标一下即跳。\n• Android 17 低内存保活：高分屏自动 2× sRGB 降采样并复用像素缓冲，前台常驻防杀。"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
         </LinearLayout>

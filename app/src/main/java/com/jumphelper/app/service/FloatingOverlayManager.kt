@@ -42,6 +42,8 @@ class FloatingOverlayManager(
     private var controlParams: WindowManager.LayoutParams? = null
     private var collapsedPill: TextView? = null
     private var expandedPanel: LinearLayout? = null
+    private var tuningRow: LinearLayout? = null
+    private var btnToggleTune: TextView? = null
     private var tvOverlayStatus: TextView? = null
     private var tvLastJump: TextView? = null
     private var btnAutoToggle: TextView? = null
@@ -53,6 +55,7 @@ class FloatingOverlayManager(
     private var manualAimView: ManualAimOverlayView? = null
 
     private var isCollapsed = false
+    private var isTuningExpanded = false
     private val clearMarkerRunnable = Runnable {
         markerOverlayView?.clearMarkers()
     }
@@ -85,18 +88,39 @@ class FloatingOverlayManager(
         prefs.resetOverlayPosition()
         val params = controlParams ?: return
         val bounds = getDisplayBounds()
-        params.x = dp(12)
-        params.y = (bounds.height() * 0.14f).toInt()
+        // Default bottom-safe parking spot sits outside the gameplay scan band -> zero flicker!
+        params.x = dp(16)
+        params.y = (bounds.height() * 0.84f).toInt()
         controlRootView?.let { view ->
+            clampParamsToScreen(view, params)
             safeUpdateViewLayout(view, params)
         }
     }
 
-    fun setHiddenForCapture(hidden: Boolean) {
+    /**
+     * Checks whether the floating control bar currently intersects the active gameplay scan area.
+     * If false, we can capture screenshots without hiding the control bar (zero flicker!).
+     */
+    fun doesControlBarOverlapScanArea(): Boolean {
+        val barRect = getControlBarRect()
+        if (barRect.isEmpty) return false
+        val bounds = getDisplayBounds()
+        val (scanTop, scanBottom) = JumpDetector.getScanVerticalBounds(bounds.width(), bounds.height())
+        val safeMargin = dp(14)
+        return barRect.bottom > (scanTop - safeMargin) && barRect.top < (scanBottom + safeMargin)
+    }
+
+    fun hasVisibleMarkers(): Boolean {
+        return markerOverlayView?.visibility == View.VISIBLE
+    }
+
+    fun setHiddenForCapture(hidden: Boolean, hideControlBar: Boolean = true) {
         if (hidden) {
             mainHandler.removeCallbacks(clearMarkerRunnable)
             markerOverlayView?.clearMarkers()
-            controlRootView?.visibility = View.INVISIBLE
+            if (hideControlBar) {
+                controlRootView?.visibility = View.INVISIBLE
+            }
         } else {
             applyVisibilityFromPrefs()
         }
@@ -109,9 +133,12 @@ class FloatingOverlayManager(
         boardY: Float,
         pressMs: Long,
         sourceWidth: Int = 0,
-        sourceHeight: Int = 0
+        sourceHeight: Int = 0,
+        confidence: Float = 0.90f,
+        isWhiteDot: Boolean = false,
+        isEscortWarning: Boolean = false
     ) {
-        if (!prefs.showDebugMarker) return
+        if (!prefs.showDebugMarker && !isEscortWarning) return
         ensureMarkerWindow()
         val bounds = getDisplayBounds()
         val scaleX = if (sourceWidth > 0 && bounds.width() > 0) bounds.width() / sourceWidth.toFloat() else 1f
@@ -122,10 +149,14 @@ class FloatingOverlayManager(
             rawPieceY = pieceY * scaleY,
             rawBoardX = boardX * scaleX,
             rawBoardY = boardY * scaleY,
-            pressDurationMs = pressMs
+            pressDurationMs = pressMs,
+            confidence = confidence,
+            isWhiteDot = isWhiteDot,
+            isEscortWarning = isEscortWarning
         )
         mainHandler.removeCallbacks(clearMarkerRunnable)
-        mainHandler.postDelayed(clearMarkerRunnable, MARKER_DISPLAY_MS)
+        val duration = if (isEscortWarning) ESCORT_MARKER_DISPLAY_MS else MARKER_DISPLAY_MS
+        mainHandler.postDelayed(clearMarkerRunnable, duration)
     }
 
     fun getControlBarRect(): Rect {
@@ -137,14 +168,20 @@ class FloatingOverlayManager(
     }
 
     fun showManualAimOverlay(
+        initialPieceRawX: Float? = null,
+        initialPieceRawY: Float? = null,
         onPointsConfirmed: (x1: Float, y1: Float, x2: Float, y2: Float) -> Unit,
         onCancelled: () -> Unit
     ) {
         removeManualAimOverlay()
+        mainHandler.removeCallbacks(clearMarkerRunnable)
+        markerOverlayView?.clearMarkers()
         controlRootView?.visibility = View.GONE
 
         val aimView = ManualAimOverlayView(
             context = context,
+            initialPieceRawX = initialPieceRawX,
+            initialPieceRawY = initialPieceRawY,
             onPointsConfirmed = { x1, y1, x2, y2 ->
                 removeManualAimOverlay()
                 onPointsConfirmed(x1, y1, x2, y2)
@@ -187,37 +224,50 @@ class FloatingOverlayManager(
         val coeff = JumpControllerState.jumpFullWidthMs.value
         val dist = JumpControllerState.lastDistancePx.value
         val pressMs = JumpControllerState.lastPressMs.value
+        val strategyTag = JumpControllerState.lastStrategyTag.value
+        val calSummary = JumpControllerState.calibrationSummary.value
 
         tvCoeffOverlay?.text = coeff.toString()
 
         when (mode) {
             RunMode.AUTO_RUNNING -> {
-                tvOverlayStatus?.text = "连跳中 · #${count}"
+                val tagSuffix = if (strategyTag.isNotEmpty()) " · $strategyTag" else ""
+                tvOverlayStatus?.text = "连跳 #${count}$tagSuffix"
                 btnAutoToggle?.text = "⏸ 暂停"
                 btnAutoToggle?.setBackgroundResource(R.drawable.bg_overlay_btn_green)
-                collapsedPill?.text = "跳"
+                collapsedPill?.text = if (count > 0) "#$count" else "跳"
+            }
+            RunMode.ESCORT_PAUSED -> {
+                tvOverlayStatus?.text = "⚠ 复杂块暂停 · #${count}"
+                btnAutoToggle?.text = "▶ 继续"
+                btnAutoToggle?.setBackgroundResource(R.drawable.bg_overlay_btn_amber)
+                collapsedPill?.text = "⚠"
             }
             RunMode.MANUAL_AIMING -> {
-                tvOverlayStatus?.text = "双点瞄准中"
+                tvOverlayStatus?.text = "一键救场瞄准中"
                 btnAutoToggle?.text = "▶ 自动"
                 btnAutoToggle?.setBackgroundResource(R.drawable.bg_overlay_btn_accent)
+                collapsedPill?.text = "🎯"
             }
             RunMode.PAUSED -> {
                 tvOverlayStatus?.text = "$status · ${count}跳"
                 btnAutoToggle?.text = "▶ 继续"
                 btnAutoToggle?.setBackgroundResource(R.drawable.bg_overlay_btn_amber)
+                collapsedPill?.text = "跳"
             }
             RunMode.IDLE -> {
                 tvOverlayStatus?.text = "$status · ${count}跳"
                 btnAutoToggle?.text = "▶ 自动"
                 btnAutoToggle?.setBackgroundResource(R.drawable.bg_overlay_btn_accent)
+                collapsedPill?.text = "跳"
             }
         }
 
-        tvLastJump?.text = if (pressMs > 0L) {
-            "距${dist.toInt()}px → ${pressMs}ms · 跳近点+ 跳远点-"
-        } else {
-            "跳近点+ · 跳远点- · 长按系数重置"
+        tvLastJump?.text = when {
+            mode == RunMode.ESCORT_PAUSED -> "请点「🎯 救场」一键起跳，或点单步强跳"
+            pressMs > 0L -> "${dist.toInt()}px→${pressMs}ms · $calSummary"
+            prefs.autoCalibrateEnabled -> "智能自校准已开启 · 拖到底部零闪烁"
+            else -> "已关闭自校准 · 点「调参」可微调系数"
         }
     }
 
@@ -251,6 +301,8 @@ class FloatingOverlayManager(
         val root = LayoutInflater.from(context).inflate(R.layout.overlay_control_bar, null)
         collapsedPill = root.findViewById(R.id.collapsedPill)
         expandedPanel = root.findViewById(R.id.expandedPanel)
+        tuningRow = root.findViewById(R.id.tuningRow)
+        btnToggleTune = root.findViewById(R.id.btnToggleTune)
         tvOverlayStatus = root.findViewById(R.id.tvOverlayStatus)
         tvLastJump = root.findViewById(R.id.tvLastJump)
         btnAutoToggle = root.findViewById(R.id.btnAutoToggle)
@@ -269,12 +321,13 @@ class FloatingOverlayManager(
         val initX = if (prefs.overlayX != Int.MIN_VALUE) {
             prefs.overlayX.coerceIn(0, (bounds.width() - dp(60)).coerceAtLeast(0))
         } else {
-            dp(12)
+            dp(16)
         }
         val initY = if (prefs.overlayY != Int.MIN_VALUE) {
             prefs.overlayY.coerceIn(0, (bounds.height() - dp(60)).coerceAtLeast(0))
         } else {
-            (bounds.height() * 0.14f).toInt()
+            // Default park at bottom (outside gameplay scan band) for zero-flicker capture
+            (bounds.height() * 0.84f).toInt()
         }
 
         val params = WindowManager.LayoutParams(
@@ -296,6 +349,17 @@ class FloatingOverlayManager(
         }
 
         btnCollapse.setOnClickListener { setCollapsed(true) }
+        btnToggleTune?.setOnClickListener {
+            isTuningExpanded = !isTuningExpanded
+            tuningRow?.visibility = if (isTuningExpanded) View.VISIBLE else View.GONE
+            btnToggleTune?.text = if (isTuningExpanded) "收起调参" else "调参"
+            controlRootView?.let { view ->
+                controlParams?.let { p ->
+                    clampParamsToScreen(view, p)
+                    safeUpdateViewLayout(view, p)
+                }
+            }
+        }
         btnAutoToggle?.setOnClickListener { listener.onAutoToggleRequested() }
         btnSingleStep?.setOnClickListener { listener.onSingleStepRequested() }
         btnManualAim?.setOnClickListener { listener.onManualAimRequested() }
@@ -308,15 +372,17 @@ class FloatingOverlayManager(
         tvCoeffOverlay?.setOnClickListener {
             Toast.makeText(
                 context,
-                "跳近调大(+)、跳远调小(-)；长按重置为 ${JumpDetector.DEFAULT_JUMP_FULL_WIDTH_MS}ms",
+                "跳近调大(+)、跳远调小(-)；长按重置为 ${JumpDetector.RECOMMENDED_INITIAL_COEFF_MS}ms",
                 Toast.LENGTH_SHORT
             ).show()
         }
         tvCoeffOverlay?.setOnLongClickListener {
-            prefs.jumpFullWidthMs = JumpDetector.DEFAULT_JUMP_FULL_WIDTH_MS
+            prefs.resetCalibration()
             JumpControllerState.setJumpFullWidthMs(prefs.jumpFullWidthMs)
+            JumpControllerState.setPressOffsetMs(prefs.pressOffsetMs)
             listener.onCoefficientAdjusted(prefs.jumpFullWidthMs)
             refreshUi()
+            Toast.makeText(context, "已重置系数与自校准记录", Toast.LENGTH_SHORT).show()
             true
         }
 
@@ -403,8 +469,8 @@ class FloatingOverlayManager(
 
     private fun clampParamsToScreen(root: View, params: WindowManager.LayoutParams) {
         val bounds = getDisplayBounds()
-        val viewW = if (root.width > 0) root.width else dp(46)
-        val viewH = if (root.height > 0) root.height else dp(46)
+        val viewW = if (root.width > 0) root.width else dp(48)
+        val viewH = if (root.height > 0) root.height else dp(48)
         val maxX = (bounds.width() - viewW).coerceAtLeast(0)
         val maxY = (bounds.height() - viewH).coerceAtLeast(0)
         params.x = params.x.coerceIn(0, maxX)
@@ -446,5 +512,6 @@ class FloatingOverlayManager(
 
     companion object {
         private const val MARKER_DISPLAY_MS = 1250L
+        private const val ESCORT_MARKER_DISPLAY_MS = 3800L
     }
 }

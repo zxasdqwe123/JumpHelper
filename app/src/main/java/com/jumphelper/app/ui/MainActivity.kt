@@ -65,6 +65,7 @@ class MainActivity : AppCompatActivity() {
 
         prefs = JumpPreferences(this)
         JumpControllerState.setJumpFullWidthMs(prefs.jumpFullWidthMs)
+        JumpControllerState.setPressOffsetMs(prefs.pressOffsetMs)
 
         setupEdgeToEdgeInsets()
         renderDeviceInfo()
@@ -142,7 +143,7 @@ class MainActivity : AppCompatActivity() {
             if (service != null) {
                 service.resetOverlayPosition()
                 binding.switchShowOverlay.isChecked = true
-                Toast.makeText(this, "已重置悬浮控制条位置", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "已重置悬浮控制条到底部零闪烁区", Toast.LENGTH_SHORT).show()
             } else {
                 Toast.makeText(this, getString(R.string.service_not_ready), Toast.LENGTH_SHORT).show()
             }
@@ -151,6 +152,40 @@ class MainActivity : AppCompatActivity() {
         binding.switchShowOverlay.setOnCheckedChangeListener { _, isChecked ->
             prefs.showOverlay = isChecked
             JumpAccessibilityService.instance?.refreshOverlayFromPrefs()
+        }
+
+        binding.switchAutoCalibrate.setOnCheckedChangeListener { _, isChecked ->
+            prefs.autoCalibrateEnabled = isChecked
+            JumpAccessibilityService.instance?.refreshOverlayFromPrefs()
+            renderCalibrationBanner(JumpControllerState.calibrationSummary.value)
+        }
+
+        binding.switchSmartEscort.setOnCheckedChangeListener { _, isChecked ->
+            prefs.smartEscortEnabled = isChecked
+        }
+
+        binding.btnResetCalibration.setOnClickListener {
+            val service = JumpAccessibilityService.instance
+            if (service != null) {
+                service.resetAutoCalibration()
+            } else {
+                prefs.resetCalibration()
+                JumpControllerState.setJumpFullWidthMs(prefs.jumpFullWidthMs)
+                JumpControllerState.setPressOffsetMs(prefs.pressOffsetMs)
+                JumpControllerState.setCalibrationSummary("自校准已重置")
+            }
+            syncPreferencesToViews()
+            Toast.makeText(this, "已恢复推荐初始参数并重置自校准", Toast.LENGTH_SHORT).show()
+        }
+
+        binding.btnTempoTurbo.setOnClickListener {
+            applyTempoPreset(JumpPreferences.TEMPO_TURBO_MS, "极速节奏已应用")
+        }
+        binding.btnTempoBalanced.setOnClickListener {
+            applyTempoPreset(JumpPreferences.TEMPO_BALANCED_MS, "均衡推荐节奏已应用")
+        }
+        binding.btnTempoSteady.setOnClickListener {
+            applyTempoPreset(JumpPreferences.TEMPO_STEADY_MS, "稳健节奏已应用")
         }
 
         binding.switchDebugMarker.setOnCheckedChangeListener { _, isChecked ->
@@ -179,7 +214,7 @@ class MainActivity : AppCompatActivity() {
             updateCoeffValue(prefs.jumpFullWidthMs + 20)
         }
         binding.btnHomeResetCoeff.setOnClickListener {
-            updateCoeffValue(JumpDetector.DEFAULT_JUMP_FULL_WIDTH_MS)
+            updateCoeffValue(JumpDetector.RECOMMENDED_INITIAL_COEFF_MS)
         }
 
         binding.seekOffset.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -208,8 +243,7 @@ class MainActivity : AppCompatActivity() {
                 if (suppressSeekCallback) return
                 val minMs = JumpPreferences.MIN_INTERVAL_FLOOR_MS + progress
                 prefs.minIntervalMs = minMs
-                binding.tvIntervalValue.text =
-                    "连跳随机等待：${prefs.minIntervalMs} ~ ${prefs.maxIntervalMs} ms"
+                renderIntervalLabel()
             }
 
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
@@ -221,9 +255,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun applyTempoPreset(minMs: Int, toastMsg: String) {
+        prefs.minIntervalMs = minMs
+        suppressSeekCallback = true
+        binding.seekInterval.progress = (prefs.minIntervalMs - JumpPreferences.MIN_INTERVAL_FLOOR_MS)
+            .coerceIn(0, binding.seekInterval.max)
+        suppressSeekCallback = false
+        renderIntervalLabel()
+        Toast.makeText(this, toastMsg, Toast.LENGTH_SHORT).show()
+    }
+
     private fun syncPreferencesToViews() {
         binding.switchForegroundKeepAlive.isChecked = prefs.foregroundKeepAlive
         binding.switchShowOverlay.isChecked = prefs.showOverlay
+        binding.switchAutoCalibrate.isChecked = prefs.autoCalibrateEnabled
+        binding.switchSmartEscort.isChecked = prefs.smartEscortEnabled
         binding.switchDebugMarker.isChecked = prefs.showDebugMarker
         binding.switchPhysicsCurve.isChecked = prefs.usePhysicsCurve
 
@@ -239,9 +285,10 @@ class MainActivity : AppCompatActivity() {
         val intervalProgress = (prefs.minIntervalMs - JumpPreferences.MIN_INTERVAL_FLOOR_MS)
             .coerceIn(0, binding.seekInterval.max)
         binding.seekInterval.progress = intervalProgress
-        binding.tvIntervalValue.text =
-            "连跳随机等待：${prefs.minIntervalMs} ~ ${prefs.maxIntervalMs} ms"
+        renderIntervalLabel()
         suppressSeekCallback = false
+
+        renderCalibrationBanner(JumpControllerState.calibrationSummary.value)
     }
 
     private fun updateCoeffValue(rawValue: Int) {
@@ -259,6 +306,8 @@ class MainActivity : AppCompatActivity() {
     private fun updateOffsetValue(rawValue: Int) {
         val clamped = rawValue.coerceIn(JumpDetector.MIN_PRESS_OFFSET_MS, JumpDetector.MAX_PRESS_OFFSET_MS)
         prefs.pressOffsetMs = clamped
+        JumpControllerState.setPressOffsetMs(clamped)
+        JumpAccessibilityService.instance?.refreshOverlayFromPrefs()
 
         suppressSeekCallback = true
         binding.seekOffset.progress = clamped - JumpDetector.MIN_PRESS_OFFSET_MS
@@ -275,6 +324,19 @@ class MainActivity : AppCompatActivity() {
     private fun renderOffsetLabel(offset: Int) {
         val sign = if (offset > 0) "+" else ""
         binding.tvOffsetValue.text = "固定触控延迟补偿：$sign$offset ms"
+    }
+
+    private fun renderIntervalLabel() {
+        binding.tvIntervalValue.text =
+            "连跳节奏等待：${prefs.minIntervalMs} ~ ${prefs.maxIntervalMs} ms（长跳自动补缓冲）"
+    }
+
+    private fun renderCalibrationBanner(summary: String) {
+        binding.tvCalibrationStatus.text = if (prefs.autoCalibrateEnabled) {
+            "自校准状态：$summary"
+        } else {
+            "自校准状态：已关闭（使用手动参数）"
+        }
     }
 
     private fun observeControllerState() {
@@ -321,6 +383,22 @@ class MainActivity : AppCompatActivity() {
                             (coeff - JumpPreferences.MIN_COEFF_MS).coerceIn(0, binding.seekCoeff.max)
                         suppressSeekCallback = false
                         renderCoeffLabel(coeff)
+                    }
+                }
+
+                launch {
+                    JumpControllerState.pressOffsetMs.collect { offset ->
+                        suppressSeekCallback = true
+                        binding.seekOffset.progress =
+                            (offset - JumpDetector.MIN_PRESS_OFFSET_MS).coerceIn(0, binding.seekOffset.max)
+                        suppressSeekCallback = false
+                        renderOffsetLabel(offset)
+                    }
+                }
+
+                launch {
+                    JumpControllerState.calibrationSummary.collect { summary ->
+                        renderCalibrationBanner(summary)
                     }
                 }
             }

@@ -18,8 +18,8 @@ class JumpDetectorTest {
         // Pawn on left (pieceX = 320, base bottom at y = 1380)
         drawPawn(pixels, w, h, centerX = 320, bottomY = 1380, shortEdge = w)
 
-        // Diamond target block on right (boardX = 760, topY = 980)
-        drawDiamondBlock(pixels, w, h, centerX = 760, topY = 980, halfWidth = 130, halfHeight = 76)
+        // Diamond target block on right at true 30-deg isometric elevation (boardX = 760, boardY = 1106)
+        drawDiamondBlock(pixels, w, h, centerX = 760, topY = 1030, halfWidth = 130, halfHeight = 76)
 
         // Stray music note / floating score on the pawn's side (should be ignored)
         drawRect(pixels, w, h, left = 260, top = 740, right = 340, bottom = 770, color = rgb(255, 255, 255))
@@ -31,7 +31,7 @@ class JumpDetectorTest {
         assertEquals(320f, result.pieceX, 6f)
         assertEquals(760f, result.boardX, 8f)
         assertEquals(1080, result.shortEdge)
-        // dx = 440, parabolic formula yields ~688ms
+        // dx = 440 on 30-deg axis, parabolic formula yields ~688ms
         assertTrue("Press time ${result.pressTimeMs} out of expected range", result.pressTimeMs in 670L..715L)
     }
 
@@ -240,6 +240,156 @@ class JumpDetectorTest {
         )
     }
 
+    @Test
+    fun stripsCastGroundShadowOnGreenRoundTableUnderPinkBackground() {
+        val w = 636
+        val h = 1400
+        val pixels = createTintedBackground(w, h, baseR = 226, baseG = 210, baseB = 212)
+
+        drawPawn(pixels, w, h, centerX = 180, bottomY = 820, shortEdge = w)
+
+        // Heavy 0.70x multiplicative cast ground shadow extending far to the lower-left of the green table
+        drawGroundShadowEllipse(pixels, w, h, centerX = 438, centerY = 636, rx = 86, ry = 54, factor = 0.70f)
+        // Actual green round table centered at (498, 616)
+        drawEllipseBlock(pixels, w, h, centerX = 498, topY = 570, rx = 78, ry = 46, color = rgb(99, 147, 105))
+
+        val outcome = JumpDetector.detect(pixels, w, h)
+        assertTrue("Expected detection success on shadowed green table, got $outcome", outcome is JumpDetector.DetectionOutcome.Success)
+        val result = (outcome as JumpDetector.DetectionOutcome.Success).result
+        assertEquals("Shadow should not drag boardX left", 498f, result.boardX, 4.5f)
+        assertEquals("Thin ellipse equator should hit true cy", 616f, result.boardY, 6f)
+        assertTrue("Expected high confidence, got ${result.confidence}", result.confidence >= 0.80f)
+    }
+
+    @Test
+    fun centersAccuratelyOnAsymmetricLongRectangularBench() {
+        val w = 636
+        val h = 1400
+        val pixels = createTintedBackground(w, h, baseR = 204, baseG = 207, baseB = 218)
+
+        drawPawn(pixels, w, h, centerX = 185, bottomY = 815, shortEdge = w)
+
+        // Asymmetric parallelogram top face: top vertex at (415, 550), short left edge L1=40, long right edge L2=110.
+        // Left corner: (415 - 35, 550 + 20) = (380, 570)
+        // Right corner: (415 + 95, 550 + 55) = (510, 605)
+        // True geometric center = ((380+510)/2, (570+605)/2) = (445, 587.5) — 30px away from topX!
+        drawAsymmetricParallelogram(
+            pixels, w, h,
+            topX = 415f, topY = 550f,
+            leftSpanX = 35f, leftSpanY = 20f,
+            rightSpanX = 95f, rightSpanY = 55f,
+            color = rgb(168, 124, 88)
+        )
+
+        val outcome = JumpDetector.detect(pixels, w, h)
+        assertTrue("Expected asymmetric bench detection, got $outcome", outcome is JumpDetector.DetectionOutcome.Success)
+        val result = (outcome as JumpDetector.DetectionOutcome.Success).result
+        assertEquals("Asymmetric bench centerX should use (left+right)/2, not topX", 445f, result.boardX, 6f)
+        assertEquals("Asymmetric bench centerY should use (leftY+rightY)/2", 587.5f, result.boardY, 8f)
+    }
+
+    @Test
+    fun detectsMultiColorRubiksCubeWithoutFragmenting() {
+        val w = 636
+        val h = 1400
+        val pixels = createTintedBackground(w, h, baseR = 204, baseG = 207, baseB = 218)
+
+        drawPawn(pixels, w, h, centerX = 450, bottomY = 810, shortEdge = w)
+
+        // 3x3 colorful Rubik's cube diamond top face centered at (200, 630)
+        val cubeColors = intArrayOf(
+            rgb(230, 58, 52), rgb(246, 212, 48), rgb(52, 132, 232),
+            rgb(58, 186, 86), rgb(245, 130, 40), rgb(248, 248, 248)
+        )
+        drawMultiColorDiamondBlock(pixels, w, h, centerX = 200, topY = 576, halfWidth = 96, halfHeight = 54, palette = cubeColors)
+
+        val outcome = JumpDetector.detect(pixels, w, h)
+        assertTrue("Expected Rubik's cube detection, got $outcome", outcome is JumpDetector.DetectionOutcome.Success)
+        val result = (outcome as JumpDetector.DetectionOutcome.Success).result
+        assertEquals(200f, result.boardX, 6f)
+        assertEquals(630f, result.boardY, 8f)
+    }
+
+    @Test
+    fun ignoresNarrowTopCapProtrusionAndCentersOnMainDeck() {
+        val w = 636
+        val h = 1400
+        val pixels = createTintedBackground(w, h, baseR = 204, baseG = 207, baseB = 218)
+
+        drawPawn(pixels, w, h, centerX = 190, bottomY = 810, shortEdge = w)
+
+        // Main wide landing deck centered at (445, 645)
+        drawDiamondBlock(pixels, w, h, centerX = 445, topY = 595, halfWidth = 92, halfHeight = 52)
+        // Narrow off-center signboard/bottle-cap protrusion sitting right on top of the deck
+        drawRect(pixels, w, h, left = 422, top = 566, right = 446, bottom = 598, color = rgb(235, 96, 72))
+
+        val outcome = JumpDetector.detect(pixels, w, h)
+        assertTrue("Expected detection past top protrusion, got $outcome", outcome is JumpDetector.DetectionOutcome.Success)
+        val result = (outcome as JumpDetector.DetectionOutcome.Success).result
+        assertEquals(445f, result.boardX, 8f)
+    }
+
+    @Test
+    fun locksSubPixelWhiteBullseyeDotOnColoredBlockAndRejectsOnWhiteBlock() {
+        val w = 636
+        val h = 1400
+        val pixels = createTintedBackground(w, h, baseR = 204, baseG = 207, baseB = 218)
+
+        drawPawn(pixels, w, h, centerX = 430, bottomY = 800, shortEdge = w)
+        drawEllipseBlock(pixels, w, h, centerX = 215, topY = 588, rx = 80, ry = 46, color = rgb(104, 152, 108))
+        // Exact WeChat Jump #F4F4F4 target dot (22x12 ellipse on 636px shortEdge) centered at (217, 634)
+        drawEllipseBlock(pixels, w, h, centerX = 217, topY = 628, rx = 11, ry = 6, color = rgb(244, 244, 244))
+
+        val outcome = JumpDetector.detect(pixels, w, h)
+        assertTrue(outcome is JumpDetector.DetectionOutcome.Success)
+        val result = (outcome as JumpDetector.DetectionOutcome.Success).result
+        assertEquals(JumpDetector.DetectionStrategy.WHITE_DOT, result.strategy)
+        assertEquals(217f, result.boardX, 1.5f)
+        assertEquals(634f, result.boardY, 1.5f)
+        assertTrue("White dot lock should carry >= 0.95 confidence", result.confidence >= 0.95f)
+
+        // Now verify a pure white block does NOT falsely trigger WHITE_DOT
+        val whitePixels = createTintedBackground(w, h, baseR = 204, baseG = 207, baseB = 218)
+        drawPawn(whitePixels, w, h, centerX = 430, bottomY = 800, shortEdge = w)
+        drawEllipseBlock(whitePixels, w, h, centerX = 215, topY = 588, rx = 80, ry = 46, color = rgb(246, 246, 246))
+        val whiteOutcome = JumpDetector.detect(whitePixels, w, h) as JumpDetector.DetectionOutcome.Success
+        assertEquals(JumpDetector.DetectionStrategy.GEOMETRY_FIT, whiteOutcome.result.strategy)
+    }
+
+    @Test
+    fun detectsDarkGameOverOverlayGracefully() {
+        val w = 636
+        val h = 1400
+        val pixels = IntArray(w * h) { rgb(48, 52, 60) }
+        val outcome = JumpDetector.detect(pixels, w, h)
+        assertTrue(outcome is JumpDetector.DetectionOutcome.Failure)
+        assertTrue("Expected isGameOverScreen=true", (outcome as JumpDetector.DetectionOutcome.Failure).isGameOverScreen)
+    }
+
+    @Test
+    fun isometric3DBackProjectionMatchesOnAxisAndCorrectsOffAxis() {
+        // Strictly on 30 deg axis: dy = dx * tan(30) => d3d == dx
+        val onAxis = JumpDetector.computeEffectiveDistance(
+            dx = 400f,
+            dy = 400f * 0.57735f,
+            shortEdge = 1272,
+            strategy = JumpDetector.DetectionStrategy.WHITE_DOT,
+            confidence = 0.98f
+        )
+        assertEquals(400f, onAxis, 1.0f)
+
+        // Pawn landed slightly forward/lower than block center => dy is larger than dx * tan(30),
+        // so true 3D jump distance must be longer than dx alone!
+        val offAxisLonger = JumpDetector.computeEffectiveDistance(
+            dx = 400f,
+            dy = 265f,
+            shortEdge = 1272,
+            strategy = JumpDetector.DetectionStrategy.WHITE_DOT,
+            confidence = 0.98f
+        )
+        assertTrue("Expected 3D back-projection ($offAxisLonger) > dx (400)", offAxisLonger > 418f)
+    }
+
     private fun createGradientBackground(w: Int, h: Int): IntArray {
         val pixels = IntArray(w * h)
         for (y in 0 until h) {
@@ -342,6 +492,96 @@ class JumpDetectorTest {
             val offset = y * w
             for (x in left.coerceAtLeast(0)..right.coerceAtMost(w - 1)) {
                 pixels[offset + x] = color
+            }
+        }
+    }
+
+    private fun createTintedBackground(w: Int, h: Int, baseR: Int, baseG: Int, baseB: Int): IntArray {
+        val pixels = IntArray(w * h)
+        for (y in 0 until h) {
+            val t = y.toFloat() / h
+            val r = (baseR - t * 14).toInt().coerceIn(0, 255)
+            val g = (baseG - t * 14).toInt().coerceIn(0, 255)
+            val b = (baseB - t * 12).toInt().coerceIn(0, 255)
+            val c = rgb(r, g, b)
+            val off = y * w
+            for (x in 0 until w) pixels[off + x] = c
+        }
+        return pixels
+    }
+
+    private fun drawGroundShadowEllipse(
+        pixels: IntArray,
+        w: Int,
+        h: Int,
+        centerX: Int,
+        centerY: Int,
+        rx: Int,
+        ry: Int,
+        factor: Float
+    ) {
+        for (y in (centerY - ry).coerceAtLeast(0)..(centerY + ry).coerceAtMost(h - 1)) {
+            val ny = (y - centerY) / ry.toFloat().coerceAtLeast(1f)
+            val hw = (rx * sqrt((1f - ny * ny).coerceAtLeast(0f))).toInt()
+            val off = y * w
+            for (x in (centerX - hw).coerceAtLeast(0)..(centerX + hw).coerceAtMost(w - 1)) {
+                val p = pixels[off + x]
+                val r = (((p ushr 16) and 0xFF) * factor).toInt().coerceIn(0, 255)
+                val g = (((p ushr 8) and 0xFF) * factor).toInt().coerceIn(0, 255)
+                val b = ((p and 0xFF) * factor).toInt().coerceIn(0, 255)
+                pixels[off + x] = rgb(r, g, b)
+            }
+        }
+    }
+
+    private fun drawAsymmetricParallelogram(
+        pixels: IntArray,
+        w: Int,
+        h: Int,
+        topX: Float,
+        topY: Float,
+        leftSpanX: Float,
+        leftSpanY: Float,
+        rightSpanX: Float,
+        rightSpanY: Float,
+        color: Int
+    ) {
+        // Fill parallelogram parameterized by u, v in [0, 1]: P(u,v) = Top + u*(-leftSpanX, leftSpanY) + v*(rightSpanX, rightSpanY)
+        val steps = 220
+        for (iu in 0..steps) {
+            val u = iu / steps.toFloat()
+            for (iv in 0..steps) {
+                val v = iv / steps.toFloat()
+                val px = (topX - u * leftSpanX + v * rightSpanX).toInt()
+                val py = (topY + u * leftSpanY + v * rightSpanY).toInt()
+                if (px in 0 until w && py in 0 until h) {
+                    pixels[py * w + px] = color
+                }
+            }
+        }
+    }
+
+    private fun drawMultiColorDiamondBlock(
+        pixels: IntArray,
+        w: Int,
+        h: Int,
+        centerX: Int,
+        topY: Int,
+        halfWidth: Int,
+        halfHeight: Int,
+        palette: IntArray
+    ) {
+        val endY = (topY + halfHeight * 2).coerceAtMost(h - 1)
+        for (y in topY.coerceAtLeast(0)..endY) {
+            val dy = abs(y - (topY + halfHeight))
+            val ratio = 1f - (dy.toFloat() / halfHeight.coerceAtLeast(1))
+            val hw = (halfWidth * ratio).toInt().coerceAtLeast(1)
+            val rowOffset = y * w
+            val cellY = ((y - topY) * 3) / (halfHeight * 2).coerceAtLeast(1)
+            for (x in (centerX - hw).coerceAtLeast(0)..(centerX + hw).coerceAtMost(w - 1)) {
+                val cellX = ((x - (centerX - halfWidth)) * 3) / (halfWidth * 2).coerceAtLeast(1)
+                val color = palette[(cellX + cellY * 3).coerceAtLeast(0) % palette.size]
+                pixels[rowOffset + x] = color
             }
         }
     }

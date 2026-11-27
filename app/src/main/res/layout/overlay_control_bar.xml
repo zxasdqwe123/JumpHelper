@@ -6,13 +6,13 @@
     <!-- Collapsed floating pill -->
     <TextView
         android:id="@+id/collapsedPill"
-        android:layout_width="46dp"
-        android:layout_height="46dp"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
         android:background="@drawable/bg_overlay_pill"
         android:gravity="center"
         android:text="跳"
         android:textColor="#FFFFFFFF"
-        android:textSize="16sp"
+        android:textSize="14sp"
         android:textStyle="bold"
         android:visibility="gone" />
 
@@ -25,7 +25,7 @@
         android:orientation="vertical"
         android:padding="10dp">
 
-        <!-- Drag handle + live status + collapse -->
+        <!-- Drag handle + live status + tune toggle + collapse -->
         <LinearLayout
             android:id="@+id/dragHeader"
             android:layout_width="match_parent"
@@ -37,7 +37,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:paddingEnd="6dp"
+                android:paddingEnd="5dp"
                 android:text="⋮⋮"
                 android:textColor="#FF38BDF8"
                 android:textSize="13sp"
@@ -56,11 +56,23 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/btnToggleTune"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="5dp"
+                android:background="@drawable/bg_overlay_btn"
+                android:paddingHorizontal="7dp"
+                android:paddingVertical="3dp"
+                android:text="调参"
+                android:textColor="#FF7DD3FC"
+                android:textSize="11sp" />
+
+            <TextView
                 android:id="@+id/btnCollapse"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_overlay_btn"
-                android:paddingHorizontal="8dp"
+                android:paddingHorizontal="7dp"
                 android:paddingVertical="3dp"
                 android:text="收起"
                 android:textColor="#FFCBD5E1"
@@ -76,7 +88,7 @@
             <TextView
                 android:id="@+id/btnAutoToggle"
                 android:layout_width="0dp"
-                android:layout_height="34dp"
+                android:layout_height="35dp"
                 android:layout_marginEnd="5dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_overlay_btn_accent"
@@ -89,7 +101,7 @@
             <TextView
                 android:id="@+id/btnSingleStep"
                 android:layout_width="0dp"
-                android:layout_height="34dp"
+                android:layout_height="35dp"
                 android:layout_marginEnd="5dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_overlay_btn"
@@ -102,23 +114,25 @@
             <TextView
                 android:id="@+id/btnManualAim"
                 android:layout_width="0dp"
-                android:layout_height="34dp"
+                android:layout_height="35dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_overlay_btn"
                 android:gravity="center"
-                android:text="🎯 双点"
+                android:text="🎯 救场"
                 android:textColor="#FF7DD3FC"
                 android:textSize="12sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- Coefficient tuning row -->
+        <!-- Collapsible manual coefficient tuning row (collapsed by default for sleek UX) -->
         <LinearLayout
+            android:id="@+id/tuningRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="7dp"
             android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:visibility="gone">
 
             <TextView
                 android:id="@+id/btnMinus50"
@@ -152,7 +166,7 @@
                 android:layout_weight="1.4"
                 android:background="@drawable/bg_overlay_btn"
                 android:gravity="center"
-                android:text="1700"
+                android:text="1740"
                 android:textColor="#FF38BDF8"
                 android:textSize="11sp"
                 android:textStyle="bold" />
@@ -181,7 +195,7 @@
                 android:textSize="11sp" />
         </LinearLayout>
 
-        <!-- Last jump telemetry -->
+        <!-- Compact live telemetry + auto-calibration feedback -->
         <TextView
             android:id="@+id/tvLastJump"
             android:layout_width="match_parent"
@@ -189,7 +203,7 @@
             android:layout_marginTop="6dp"
             android:ellipsize="end"
             android:singleLine="true"
-            android:text="跳近点+ · 跳远点- · 长按系数重置"
+            android:text="智能自校准已开启 · 拖到底部零闪烁"
             android:textColor="#FF94A3B8"
             android:textSize="10sp" />
     </LinearLayout>
